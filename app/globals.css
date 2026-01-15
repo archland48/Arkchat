@@ -1,0 +1,50 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --background: #ffffff;
+  --foreground: #171717;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --background: #0a0a0a;
+    --foreground: #ededed;
+  }
+}
+
+body {
+  color: var(--foreground);
+  background: var(--background);
+  font-family: Arial, Helvetica, sans-serif;
+}
+
+@layer utilities {
+  .text-balance {
+    text-wrap: balance;
+  }
+}
+
+/* Markdown styles */
+.prose {
+  color: inherit;
+}
+
+.prose code {
+  color: inherit;
+}
+
+.prose pre {
+  background-color: rgba(0, 0, 0, 0.3);
+}
+
+.prose pre code {
+  background-color: transparent;
+  padding: 0;
+}
+
+.prose hr {
+  border-color: rgba(255, 255, 255, 0.1);
+  margin: 1.5em 0;
+}
