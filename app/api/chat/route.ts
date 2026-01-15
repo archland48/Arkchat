@@ -3,6 +3,8 @@ import OpenAI from "openai";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+export const fetchCache = "force-no-store";
+export const revalidate = 0;
 
 const openai = new OpenAI({
   baseURL: "https://space.ai-builders.com/backend/v1",
