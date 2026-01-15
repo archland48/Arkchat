@@ -15,6 +15,12 @@ WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 
+# Set build-time environment variables
+ENV NEXT_TELEMETRY_DISABLED=1
+ENV NODE_ENV=production
+# Provide a dummy token for build (API routes won't be called during build)
+ENV AI_BUILDER_TOKEN=dummy_token_for_build
+
 # Build Next.js app
 RUN npm run build
 
