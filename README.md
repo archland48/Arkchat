@@ -80,6 +80,44 @@ The app uses the AI Builder's API with the following configuration:
 - **Tailwind CSS** - Styling
 - **OpenAI SDK** - For API communication (compatible with AI Builder's API)
 
+## Deployment
+
+To deploy this application to AI Builder's platform:
+
+1. **Create a public GitHub repository** and push your code:
+   ```bash
+   git remote add origin https://github.com/yourusername/chatgpt-clone.git
+   git push -u origin main
+   ```
+
+2. **Set the repository URL** and deploy:
+   ```bash
+   export REPO_URL=https://github.com/yourusername/chatgpt-clone
+   export AI_BUILDER_TOKEN=your_token_here
+   node deploy.js
+   ```
+
+   Or use the deployment API directly:
+   ```bash
+   curl -X POST https://space.ai-builders.com/backend/v1/deployments \
+     -H "Authorization: Bearer $AI_BUILDER_TOKEN" \
+     -H "Content-Type: application/json" \
+     -d '{
+       "repo_url": "https://github.com/yourusername/chatgpt-clone",
+       "service_name": "chatgpt-clone",
+       "branch": "main",
+       "port": 3000
+     }'
+   ```
+
+3. **Monitor deployment status**:
+   ```bash
+   curl https://space.ai-builders.com/backend/v1/deployments/chatgpt-clone \
+     -H "Authorization: Bearer $AI_BUILDER_TOKEN"
+   ```
+
+The application will be available at: `https://chatgpt-clone.ai-builders.space`
+
 ## License
 
 MIT

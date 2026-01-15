@@ -1,0 +1,7 @@
+{
+  "repo_url": "",
+  "service_name": "arkchat",
+  "branch": "main",
+  "port": 3000,
+  "env_vars": {}
+}
