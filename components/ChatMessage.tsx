@@ -1,7 +1,7 @@
 "use client";
 
 import { Message } from "@/types";
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState, useRef, memo } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 
@@ -10,7 +10,7 @@ interface ChatMessageProps {
   onEdit?: (messageId: string, newContent: string) => void;
 }
 
-export default function ChatMessage({ message, onEdit }: ChatMessageProps) {
+const ChatMessage = memo(function ChatMessage({ message, onEdit }: ChatMessageProps) {
   const [displayedContent, setDisplayedContent] = useState("");
   const [isEditing, setIsEditing] = useState(false);
   const [editContent, setEditContent] = useState("");
@@ -256,4 +256,6 @@ export default function ChatMessage({ message, onEdit }: ChatMessageProps) {
       )}
     </div>
   );
-}
+});
+
+export default ChatMessage;

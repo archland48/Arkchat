@@ -28,6 +28,7 @@ export default function ChatArea({
     scrollToBottom();
   }, [conversation?.messages]);
 
+
   const handleEditMessage = (messageId: string, newContent: string) => {
     if (!conversation) return;
 
@@ -44,6 +45,7 @@ export default function ChatArea({
     if (!conversation) return;
     onUpdateConversation(conversation.id, { model });
   };
+
 
   const handleSendMessage = async (content: string) => {
     if (!conversation || !content.trim()) return;
@@ -81,6 +83,7 @@ export default function ChatArea({
             role: msg.role,
             content: msg.content,
           })),
+          bibleModeEnabled: false, // Always false since we removed the toggle
         }),
       });
 
@@ -95,6 +98,10 @@ export default function ChatArea({
       const decoder = new TextDecoder();
       let assistantContent = "";
       let hasReceivedContent = false;
+      
+      // Create a fixed ID for the assistant message at the start
+      const assistantMessageId = `assistant-${Date.now()}`;
+      let updateTimeout: NodeJS.Timeout | null = null;
 
       if (reader) {
         while (true) {
@@ -118,16 +125,39 @@ export default function ChatArea({
                 if (parsed.content) {
                   hasReceivedContent = true;
                   assistantContent += parsed.content;
-                  // Update message in real-time
-                  const assistantMessage: Message = {
-                    id: (Date.now() + 1).toString(),
-                    role: "assistant",
-                    content: assistantContent,
-                    createdAt: new Date().toISOString(),
-                  };
-                  onUpdateConversation(conversation.id, {
-                    messages: [...updatedMessages, assistantMessage],
-                  });
+                  
+                  // Use requestAnimationFrame to batch updates and reduce flickering
+                  if (updateTimeout) {
+                    clearTimeout(updateTimeout);
+                  }
+                  
+                  updateTimeout = setTimeout(() => {
+                    // Check if assistant message already exists, update it; otherwise add it
+                    const existingMessageIndex = updatedMessages.findIndex(
+                      (msg) => msg.id === assistantMessageId
+                    );
+                    
+                    const assistantMessage: Message = {
+                      id: assistantMessageId,
+                      role: "assistant",
+                      content: assistantContent,
+                      createdAt: new Date().toISOString(),
+                    };
+                    
+                    let newMessages: Message[];
+                    if (existingMessageIndex >= 0) {
+                      // Update existing message
+                      newMessages = [...updatedMessages];
+                      newMessages[existingMessageIndex] = assistantMessage;
+                    } else {
+                      // Add new message
+                      newMessages = [...updatedMessages, assistantMessage];
+                    }
+                    
+                    onUpdateConversation(conversation.id, {
+                      messages: newMessages,
+                    });
+                  }, 16); // ~60fps update rate
                 }
               } catch (e: any) {
                 if (e.message && e.message.includes("error")) {
@@ -137,6 +167,39 @@ export default function ChatArea({
               }
             }
           }
+        }
+        
+        // Clear any pending timeout and ensure final update
+        if (updateTimeout) {
+          clearTimeout(updateTimeout);
+        }
+        
+        // Ensure final update with complete content
+        if (hasReceivedContent && assistantContent) {
+          const existingMessageIndex = updatedMessages.findIndex(
+            (msg) => msg.id === assistantMessageId
+          );
+          
+          const assistantMessage: Message = {
+            id: assistantMessageId,
+            role: "assistant",
+            content: assistantContent,
+            createdAt: new Date().toISOString(),
+          };
+          
+          let newMessages: Message[];
+          if (existingMessageIndex >= 0) {
+            // Update existing message
+            newMessages = [...updatedMessages];
+            newMessages[existingMessageIndex] = assistantMessage;
+          } else {
+            // Add new message
+            newMessages = [...updatedMessages, assistantMessage];
+          }
+          
+          onUpdateConversation(conversation.id, {
+            messages: newMessages,
+          });
         }
 
         // If we didn't receive any content, something went wrong
@@ -162,18 +225,21 @@ export default function ChatArea({
 
   if (!conversation) {
     return (
-      <div className="flex-1 flex items-center justify-center bg-gray-900">
-        <div className="text-center">
-          <h1 className="text-4xl font-bold mb-4">ChatGPT Clone</h1>
-          <p className="text-gray-400 mb-8">
-            Start a new conversation to begin chatting
-          </p>
-          <button
-            onClick={onNewConversation}
-            className="px-6 py-3 bg-gray-700 hover:bg-gray-600 rounded-lg transition-colors"
-          >
-            New Chat
-          </button>
+      <div className="flex-1 flex flex-col bg-gray-900">
+        {/* Empty state */}
+        <div className="flex-1 flex items-center justify-center">
+          <div className="text-center">
+            <h1 className="text-4xl font-bold mb-4">ChatGPT Clone</h1>
+            <p className="text-gray-400 mb-8">
+              Start a new conversation to begin chatting
+            </p>
+            <button
+              onClick={onNewConversation}
+              className="px-6 py-3 bg-gray-700 hover:bg-gray-600 rounded-lg transition-colors"
+            >
+              New Chat
+            </button>
+          </div>
         </div>
       </div>
     );
@@ -217,9 +283,32 @@ export default function ChatArea({
       <div className="flex-1 overflow-y-auto p-4 space-y-4">
         {conversation.messages.length === 0 ? (
           <div className="flex items-center justify-center h-full">
-            <div className="text-center text-gray-400">
-              <p className="text-lg mb-2">Start a conversation</p>
-              <p className="text-sm">Type a message below to begin chatting</p>
+            <div className="text-center text-gray-400 max-w-2xl px-4">
+              <div className="mb-6">
+                <svg className="w-16 h-16 mx-auto mb-4 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
+                </svg>
+              </div>
+              <h1 className="text-3xl font-bold mb-4 text-gray-300">Bible Study Assistant</h1>
+              <p className="text-lg mb-6">開始您的聖經研讀之旅</p>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-8 text-left">
+                <div className="bg-gray-800 p-4 rounded-lg">
+                  <h3 className="font-semibold mb-2 text-gray-200">📖 查詢經文</h3>
+                  <p className="text-sm text-gray-400">輸入「約翰福音 3:16」或「John 3:16」</p>
+                </div>
+                <div className="bg-gray-800 p-4 rounded-lg">
+                  <h3 className="font-semibold mb-2 text-gray-200">📚 閱讀章節</h3>
+                  <p className="text-sm text-gray-400">輸入「創世記 1」或「Genesis 1」</p>
+                </div>
+                <div className="bg-gray-800 p-4 rounded-lg">
+                  <h3 className="font-semibold mb-2 text-gray-200">🔍 搜尋關鍵字</h3>
+                  <p className="text-sm text-gray-400">輸入「search for 愛」或「搜尋 信心」</p>
+                </div>
+                <div className="bg-gray-800 p-4 rounded-lg">
+                  <h3 className="font-semibold mb-2 text-gray-200">💬 提問討論</h3>
+                  <p className="text-sm text-gray-400">詢問任何聖經相關問題</p>
+                </div>
+              </div>
             </div>
           </div>
         ) : (

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useRef, KeyboardEvent } from "react";
+import BibleQuickActions from "./BibleQuickActions";
 
 interface ChatInputProps {
   onSendMessage: (message: string) => void;
@@ -22,10 +23,12 @@ export default function ChatInput({ onSendMessage, disabled }: ChatInputProps) {
   };
 
   const handleKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
-    if (e.key === "Enter" && !e.shiftKey) {
+    // Ctrl+Enter 或 Cmd+Enter 发送消息
+    if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) {
       e.preventDefault();
       handleSubmit();
     }
+    // 普通 Enter 键允许换行（不发送）
   };
 
   const adjustTextareaHeight = () => {
@@ -35,9 +38,18 @@ export default function ChatInput({ onSendMessage, disabled }: ChatInputProps) {
     }
   };
 
+  const handleQuickSelect = (query: string) => {
+    setInput(query);
+    if (textareaRef.current) {
+      textareaRef.current.focus();
+      adjustTextareaHeight();
+    }
+  };
+
   return (
     <div className="border-t border-gray-700 p-4 bg-gray-900">
       <div className="max-w-4xl mx-auto">
+        <BibleQuickActions onSelect={handleQuickSelect} />
         <div className="flex items-end gap-2 bg-gray-800 rounded-lg border border-gray-700 focus-within:border-gray-600 transition-colors">
           <textarea
             ref={textareaRef}
@@ -47,7 +59,7 @@ export default function ChatInput({ onSendMessage, disabled }: ChatInputProps) {
               adjustTextareaHeight();
             }}
             onKeyDown={handleKeyDown}
-            placeholder="Message ChatGPT..."
+            placeholder="輸入訊息或查詢聖經經文（例如：約翰福音 3:16）..."
             disabled={disabled}
             rows={1}
             className="flex-1 bg-transparent px-4 py-3 text-gray-100 placeholder-gray-500 resize-none focus:outline-none max-h-[200px] overflow-y-auto"
@@ -74,7 +86,7 @@ export default function ChatInput({ onSendMessage, disabled }: ChatInputProps) {
           </button>
         </div>
         <p className="text-xs text-gray-500 mt-2 text-center">
-          ChatGPT can make mistakes. Check important info.
+          Bible Study Assistant - 支援經文查詢、章節閱讀、關鍵字搜尋 | Enter 換行，Ctrl+Enter 或點擊按鈕發送
         </p>
       </div>
     </div>

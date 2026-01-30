@@ -1,0 +1,50 @@
+{
+  "WFWorkflowActions": [
+    {
+      "WFWorkflowActionIdentifier": "is.workflow.actions.getcontentsofurl",
+      "WFWorkflowActionParameters": {
+        "WFURL": "https://your-domain.com/api/daily-verse",
+        "WFHTTPMethod": "GET",
+        "WFHTTPHeaders": {}
+      }
+    },
+    {
+      "WFWorkflowActionIdentifier": "is.workflow.actions.getvalueforkey",
+      "WFWorkflowActionParameters": {
+        "WFInput": {
+          "Value": {
+            "Output": {
+              "UUID": "YOUR-UUID-HERE",
+              "OutputName": "Contents of URL"
+            },
+            "Type": "Output"
+          },
+          "WFSerializationType": "WFTextTokenAttachment"
+        },
+        "WFDictionaryKey": "formatted"
+      }
+    },
+    {
+      "WFWorkflowActionIdentifier": "is.workflow.actions.notification",
+      "WFWorkflowActionParameters": {
+        "WFNotificationActionBody": "今日經文\n\n{formatted}",
+        "WFNotificationActionTitle": "每日經文"
+      }
+    }
+  ],
+  "WFWorkflowClientRelease": "2.0",
+  "WFWorkflowClientVersion": "900",
+  "WFWorkflowIcon": {
+    "WFWorkflowIconStartColor": 4282601983,
+    "WFWorkflowIconGlyphNumber": 59511
+  },
+  "WFWorkflowInputContentItemClasses": [
+    "WFStringContentItem"
+  ],
+  "WFWorkflowMinimumClientVersion": 900,
+  "WFWorkflowMinimumClientVersionString": "900",
+  "WFWorkflowTypes": [
+    "NCWidget",
+    "WatchKit"
+  ]
+}

@@ -1,0 +1,97 @@
+{
+  "WFWorkflowActions": [
+    {
+      "WFWorkflowActionIdentifier": "is.workflow.actions.getcontentsofurl",
+      "WFWorkflowActionParameters": {
+        "WFURL": "https://your-domain.com/api/daily-verse",
+        "WFHTTPMethod": "GET"
+      }
+    },
+    {
+      "WFWorkflowActionIdentifier": "is.workflow.actions.getvalueforkey",
+      "WFWorkflowActionParameters": {
+        "WFDictionaryKey": "reference"
+      }
+    },
+    {
+      "WFWorkflowActionIdentifier": "is.workflow.actions.setvariable",
+      "WFWorkflowActionParameters": {
+        "WFVariableName": "Verse Reference"
+      }
+    },
+    {
+      "WFWorkflowActionIdentifier": "is.workflow.actions.getvalueforkey",
+      "WFWorkflowActionParameters": {
+        "WFDictionaryKey": "text"
+      }
+    },
+    {
+      "WFWorkflowActionIdentifier": "is.workflow.actions.setvariable",
+      "WFWorkflowActionParameters": {
+        "WFVariableName": "Verse Text"
+      }
+    },
+    {
+      "WFWorkflowActionIdentifier": "is.workflow.actions.text",
+      "WFWorkflowActionParameters": {
+        "WFTextActionText": "{Verse Reference}\n\n{Verse Text}"
+      }
+    },
+    {
+      "WFWorkflowActionIdentifier": "is.workflow.actions.makeimage",
+      "WFWorkflowActionParameters": {
+        "WFMakeImageBackgroundColor": {
+          "Value": {
+            "Red": 0.1,
+            "Green": 0.1,
+            "Blue": 0.2,
+            "Alpha": 1,
+            "Color Space": "RGB"
+          },
+          "WFSerializationType": "WFColorValue"
+        },
+        "WFMakeImageFont": {
+          "Value": {
+            "FontName": "PingFang TC",
+            "FontSize": 24
+          },
+          "WFSerializationType": "WFFontValue"
+        },
+        "WFMakeImageText": "{Verse Reference}\n\n{Verse Text}",
+        "WFMakeImageTextColor": {
+          "Value": {
+            "Red": 1,
+            "Green": 1,
+            "Blue": 1,
+            "Alpha": 1,
+            "Color Space": "RGB"
+          },
+          "WFSerializationType": "WFColorValue"
+        },
+        "WFMakeImageWidth": 1080,
+        "WFMakeImageHeight": 1920
+      }
+    },
+    {
+      "WFWorkflowActionIdentifier": "is.workflow.actions.savephototocameraroll",
+      "WFWorkflowActionParameters": {
+        "WFAddToPhotoAlbum": "每日經文"
+      }
+    }
+  ],
+  "WFWorkflowClientRelease": "2.0",
+  "WFWorkflowClientVersion": "900",
+  "WFWorkflowIcon": {
+    "WFWorkflowIconStartColor": 4282601983,
+    "WFWorkflowIconGlyphNumber": 59511
+  },
+  "WFWorkflowInputContentItemClasses": [
+    "WFStringContentItem"
+  ],
+  "WFWorkflowMinimumClientVersion": 900,
+  "WFWorkflowMinimumClientVersionString": "900",
+  "WFWorkflowTypes": [
+    "NCWidget",
+    "WatchKit"
+  ]
+}
