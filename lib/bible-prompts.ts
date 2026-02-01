@@ -257,7 +257,7 @@ export function detectAdvancedPrompt(query: BibleQuery, userMessage: string): st
     /交叉引用|cross.reference|相關經文|related.verses|parallel|經文網絡|verse.network/i.test(userMessage) ||
     /找出.*相關|找.*連結|connect|連結.*經文|link.*verse/i.test(userMessage) ||
     /引用關係|reference.relation|經文關係|verse.relation/i.test(userMessage) ||
-    (bibleQuery.type === "verse" && /相關|連結|引用|reference|related/i.test(userMessage))
+    (query.type === "verse" && /相關|連結|引用|reference|related/i.test(userMessage))
   ) {
     return "advanced_cross_reference";
   }

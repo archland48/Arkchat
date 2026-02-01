@@ -1196,23 +1196,33 @@ ${bibleContext || "[注意：未獲取到 FHL Bible API 數據，請基於你的
     console.error("Chat API error:", error);
     const errorMessage = error.message || "Failed to process chat request";
     const isTimeout = errorMessage.includes("timed out");
+    const isUnauthorized = error.status === 401 || errorMessage.includes("401") || errorMessage.includes("Unauthorized");
     
     console.error("Error details:", {
       message: errorMessage,
       status: error.status,
       type: error.constructor.name,
       isTimeout,
+      isUnauthorized,
     });
     
-    // Return 504 for timeout errors, 500 for other errors
-    const statusCode = isTimeout ? 504 : (error.status || 500);
+    // Determine status code and error message
+    let statusCode = error.status || 500;
+    let userMessage = errorMessage;
+    
+    if (isUnauthorized) {
+      statusCode = 401;
+      userMessage = "API token is invalid or expired. Please check your API token configuration.";
+    } else if (isTimeout) {
+      statusCode = 504;
+      userMessage = "Request timed out. Please try again with a simpler query or disable Bible mode.";
+    }
     
     return new Response(
       JSON.stringify({
-        error: isTimeout 
-          ? "Request timed out. Please try again with a simpler query or disable Bible mode."
-          : errorMessage,
+        error: userMessage,
         details: error.status ? `Status: ${error.status}` : undefined,
+        isTokenIssue: isUnauthorized,
       }),
       { status: statusCode, headers: { "Content-Type": "application/json" } }
     );
