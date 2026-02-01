@@ -17,6 +17,8 @@ export default function ChatInput({
   onBibleModeToggle 
 }: ChatInputProps) {
   const [input, setInput] = useState("");
+  const [isComposing, setIsComposing] = useState(false);
+  const [justComposed, setJustComposed] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   const handleSubmit = () => {
@@ -40,8 +42,44 @@ export default function ChatInput({
     if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) {
       e.preventDefault();
       handleSubmit();
+      setJustComposed(false);
+      return;
     }
+    
+    // 如果刚刚完成中文输入确认，忽略第一个 Enter 键
+    // 这样可以避免在确认输入后立即发送消息
+    if (e.key === "Enter" && justComposed) {
+      e.preventDefault();
+      setJustComposed(false);
+      // 允许换行，但不发送
+      return;
+    }
+    
+    // 如果正在使用中文输入法（IME），Enter 键用于确认输入
+    if (e.key === "Enter" && isComposing) {
+      // 让输入法处理 Enter 键（确认输入）
+      // 标记刚刚完成输入，下一个 Enter 将被忽略
+      return;
+    }
+    
     // 普通 Enter 键允许换行（不发送）
+    // 只有在非 composition 状态下，Enter 才用于换行
+  };
+
+  // 处理中文输入法（IME）的 composition 事件
+  const handleCompositionStart = () => {
+    setIsComposing(true);
+    setJustComposed(false);
+  };
+
+  const handleCompositionEnd = () => {
+    setIsComposing(false);
+    // 标记刚刚完成输入，下一个 Enter 键将被忽略
+    setJustComposed(true);
+    // 500ms 后清除标记，避免永久阻止 Enter
+    setTimeout(() => {
+      setJustComposed(false);
+    }, 500);
   };
 
   const adjustTextareaHeight = () => {
@@ -72,6 +110,8 @@ export default function ChatInput({
               adjustTextareaHeight();
             }}
             onKeyDown={handleKeyDown}
+            onCompositionStart={handleCompositionStart}
+            onCompositionEnd={handleCompositionEnd}
             placeholder="輸入訊息或查詢聖經經文（例如：約翰福音 3:16）..."
             disabled={disabled}
             rows={1}
