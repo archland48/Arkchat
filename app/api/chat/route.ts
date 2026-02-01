@@ -57,8 +57,9 @@ export async function POST(req: NextRequest) {
     let bibleContext = "";
     let isBibleQuery = false;
     
-    // IMPORTANT: For supermind-agent-v1, skip automatic Bible query detection
-    // Let the agent model decide when to use tools, don't pre-fetch Bible data
+    // IMPORTANT: For supermind-agent-v1, skip automatic Bible query detection UNLESS Bible Mode is explicitly enabled
+    // If Bible Mode is enabled by user, always fetch Bible data regardless of model
+    // If Bible Mode is disabled, let supermind-agent-v1 decide when to use tools
     const shouldSkipBibleDetection = selectedModel === "supermind-agent-v1" && !bibleModeEnabled;
     
     // Priority: If Bible mode is enabled OR a Bible query is detected, process as Bible query

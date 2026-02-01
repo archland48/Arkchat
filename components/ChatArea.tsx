@@ -18,6 +18,7 @@ export default function ChatArea({
   onNewConversation,
 }: ChatAreaProps) {
   const [isLoading, setIsLoading] = useState(false);
+  const [bibleModeEnabled, setBibleModeEnabled] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const scrollToBottom = () => {
@@ -47,7 +48,7 @@ export default function ChatArea({
   };
 
 
-  const handleSendMessage = async (content: string) => {
+  const handleSendMessage = async (content: string, bibleMode: boolean) => {
     if (!conversation || !content.trim()) return;
 
     const userMessage: Message = {
@@ -83,7 +84,7 @@ export default function ChatArea({
             role: msg.role,
             content: msg.content,
           })),
-          bibleModeEnabled: false, // Always false since we removed the toggle
+          bibleModeEnabled: bibleMode,
         }),
       });
 
@@ -348,7 +349,12 @@ export default function ChatArea({
       </div>
 
       {/* Input */}
-      <ChatInput onSendMessage={handleSendMessage} disabled={isLoading} />
+      <ChatInput 
+        onSendMessage={handleSendMessage} 
+        disabled={isLoading}
+        bibleModeEnabled={bibleModeEnabled}
+        onBibleModeToggle={setBibleModeEnabled}
+      />
     </div>
   );
 }

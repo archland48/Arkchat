@@ -4,21 +4,34 @@ import { useState, useRef, KeyboardEvent } from "react";
 import BibleQuickActions from "./BibleQuickActions";
 
 interface ChatInputProps {
-  onSendMessage: (message: string) => void;
+  onSendMessage: (message: string, bibleModeEnabled: boolean) => void;
   disabled?: boolean;
+  bibleModeEnabled?: boolean;
+  onBibleModeToggle?: (enabled: boolean) => void;
 }
 
-export default function ChatInput({ onSendMessage, disabled }: ChatInputProps) {
+export default function ChatInput({ 
+  onSendMessage, 
+  disabled, 
+  bibleModeEnabled = false,
+  onBibleModeToggle 
+}: ChatInputProps) {
   const [input, setInput] = useState("");
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   const handleSubmit = () => {
     if (input.trim() && !disabled) {
-      onSendMessage(input);
+      onSendMessage(input, bibleModeEnabled);
       setInput("");
       if (textareaRef.current) {
         textareaRef.current.style.height = "auto";
       }
+    }
+  };
+
+  const handleBibleToggle = () => {
+    if (onBibleModeToggle) {
+      onBibleModeToggle(!bibleModeEnabled);
     }
   };
 
@@ -65,10 +78,37 @@ export default function ChatInput({ onSendMessage, disabled }: ChatInputProps) {
             className="flex-1 bg-transparent px-4 py-3 text-gray-100 placeholder-gray-500 resize-none focus:outline-none max-h-[200px] overflow-y-auto"
             style={{ minHeight: "24px" }}
           />
+          {/* Bible Mode Toggle Button */}
+          <button
+            onClick={handleBibleToggle}
+            disabled={disabled}
+            className={`m-2 p-2 rounded-lg transition-colors ${
+              bibleModeEnabled
+                ? "bg-blue-600 hover:bg-blue-700 text-white"
+                : "bg-gray-700 hover:bg-gray-600 text-gray-300"
+            } disabled:opacity-50 disabled:cursor-not-allowed`}
+            title={bibleModeEnabled ? "Bible Mode 已啟用 - 點擊關閉" : "Bible Mode 已關閉 - 點擊啟用"}
+          >
+            <svg
+              className="w-5 h-5"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"
+              />
+            </svg>
+          </button>
+          {/* Send Button */}
           <button
             onClick={handleSubmit}
             disabled={!input.trim() || disabled}
             className="m-2 p-2 bg-gray-700 hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg transition-colors"
+            title="發送訊息 (Ctrl+Enter 或 Cmd+Enter)"
           >
             <svg
               className="w-5 h-5 text-gray-300"
@@ -86,7 +126,11 @@ export default function ChatInput({ onSendMessage, disabled }: ChatInputProps) {
           </button>
         </div>
         <p className="text-xs text-gray-500 mt-2 text-center">
-          Bible Study Assistant - 支援經文查詢、章節閱讀、關鍵字搜尋 | Enter 換行，Ctrl+Enter 或點擊按鈕發送
+          {bibleModeEnabled ? (
+            <span className="text-blue-400">📖 Bible Mode 已啟用 - 將自動查詢聖經資源</span>
+          ) : (
+            "Bible Study Assistant - 支援經文查詢、章節閱讀、關鍵字搜尋 | Enter 換行，Ctrl+Enter 或點擊按鈕發送"
+          )}
         </p>
       </div>
     </div>
