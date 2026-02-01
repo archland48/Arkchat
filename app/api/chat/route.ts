@@ -48,14 +48,30 @@ export async function POST(req: NextRequest) {
 
     const { messages, model = "grok-4-fast", bibleModeEnabled = false } = await req.json();
     
+    // Validate model
+    const validModels = ["grok-4-fast", "supermind-agent-v1"];
+    const selectedModel = validModels.includes(model) ? model : "grok-4-fast";
+    
     // Detect Bible query from the last user message
     const lastMessage = messages[messages.length - 1];
     let bibleContext = "";
     let isBibleQuery = false;
     
+    // IMPORTANT: For supermind-agent-v1, skip automatic Bible query detection
+    // Let the agent model decide when to use tools, don't pre-fetch Bible data
+    const shouldSkipBibleDetection = selectedModel === "supermind-agent-v1" && !bibleModeEnabled;
+    
     // Priority: If Bible mode is enabled OR a Bible query is detected, process as Bible query
-    if (lastMessage && lastMessage.role === "user") {
+    if (lastMessage && lastMessage.role === "user" && !shouldSkipBibleDetection) {
       const bibleQuery = detectBibleQuery(lastMessage.content);
+      
+      // Only process Bible queries if:
+      // 1. Bible mode is explicitly enabled, OR
+      // 2. A clear Bible query pattern is detected (verse, chapter, or explicit search)
+      // Skip vague keyword matches for non-Bible queries
+      const isExplicitBibleQuery = bibleQuery.type === "verse" || 
+                                    bibleQuery.type === "chapter" || 
+                                    (bibleQuery.type === "search" && bibleModeEnabled);
       
       // If Bible mode is enabled, treat ALL queries as Bible queries
       if (bibleModeEnabled && bibleQuery.type === null) {
@@ -113,8 +129,9 @@ export async function POST(req: NextRequest) {
         }
       }
       
-      // Process Bible queries (only if not already processed by bibleModeEnabled)
-      if (!bibleModeEnabled || bibleQuery.type !== null) {
+      // Process Bible queries (only if explicit Bible query detected)
+      // Skip if it's just a vague keyword match without explicit Bible context
+      if (isExplicitBibleQuery && (bibleModeEnabled || bibleQuery.type !== null)) {
       
       if (bibleQuery.type === "verse" && bibleQuery.book && bibleQuery.chapter) {
         isBibleQuery = true;
@@ -1081,10 +1098,6 @@ ${bibleContext || "[注意：未獲取到 FHL Bible API 數據，請基於你的
         { status: 400, headers: { "Content-Type": "application/json" } }
       );
     }
-
-    // Validate model
-    const validModels = ["grok-4-fast", "supermind-agent-v1"];
-    const selectedModel = validModels.includes(model) ? model : "grok-4-fast";
 
     // supermind-agent-v1 doesn't support streaming
     const useStreaming = selectedModel !== "supermind-agent-v1";

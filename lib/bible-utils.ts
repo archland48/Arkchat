@@ -205,18 +205,25 @@ export function detectBibleQuery(message: string): BibleQuery {
            new RegExp(`\\b${keywordLower.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'i').test(trimmedLower);
   });
 
-  // PRIORITY: If it's ANY Bible/faith-related keyword, question, or short query, ALWAYS treat as search
-  // This ensures ALL Bible/faith queries prioritize FHL Bible data
-  if (hasBibleKeyword || hasThemeKeyword || hasFaithKeyword || isBibleQuestion || isSingleKeyword) {
-    // Increase length limit to 500 to catch more queries
-    if (trimmedMessage.length < 500) {
-      return {
-        type: "search",
-        keyword: trimmedMessage,
-      };
-    }
-    // Even for longer messages, if it contains Bible keywords, still treat as search
-    if (hasBibleKeyword || hasThemeKeyword || hasFaithKeyword) {
+  // STRICT MODE: Only treat as Bible search if:
+  // 1. Contains explicit Bible core keywords (聖經, bible, 經文, verse, etc.)
+  // 2. OR is a clear Bible question (question word + Bible core keyword)
+  // 3. OR is a single Bible theme keyword (for short queries)
+  // 
+  // DO NOT treat vague theme keywords (like "愛", "信心") as Bible queries
+  // unless they appear with Bible core keywords or in Bible context
+  
+  // Only return search type if:
+  // - Has explicit Bible core keywords (聖經, bible, 經文, verse, chapter, gospel, etc.)
+  // - OR is a Bible question (question word + Bible core keyword)
+  // - OR is a single short Bible keyword query
+  
+  const hasExplicitBibleKeyword = hasBibleKeyword; // Only core Bible terms
+  const isExplicitBibleQuestion = questionWords.test(message) && bibleCoreKeywords.test(message);
+  
+  if (hasExplicitBibleKeyword || isExplicitBibleQuestion || (isSingleKeyword && hasBibleKeyword)) {
+    // Only treat as search if message is reasonably short or contains explicit Bible keywords
+    if (trimmedMessage.length < 200 || hasExplicitBibleKeyword) {
       return {
         type: "search",
         keyword: trimmedMessage,
