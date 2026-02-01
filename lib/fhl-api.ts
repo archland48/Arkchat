@@ -6,6 +6,34 @@
  */
 
 const FHL_API_BASE = "https://bible.fhl.net/json/";
+const FHL_API_TIMEOUT = 8000; // 8 seconds timeout for FHL API calls
+
+/**
+ * Fetch with timeout wrapper
+ */
+async function fetchWithTimeout(
+  url: string,
+  options: RequestInit = {},
+  timeout: number = FHL_API_TIMEOUT
+): Promise<Response> {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), timeout);
+
+  try {
+    const response = await fetch(url, {
+      ...options,
+      signal: controller.signal,
+    });
+    clearTimeout(timeoutId);
+    return response;
+  } catch (error: any) {
+    clearTimeout(timeoutId);
+    if (error.name === 'AbortError') {
+      throw new Error(`FHL API timeout after ${timeout}ms`);
+    }
+    throw error;
+  }
+}
 
 export interface BibleVerse {
   bid: number;
@@ -69,7 +97,7 @@ export async function getBibleVerse(
     params.append("sec", verse);
   }
 
-  const response = await fetch(`${FHL_API_BASE}qb.php?${params.toString()}`);
+  const response = await fetchWithTimeout(`${FHL_API_BASE}qb.php?${params.toString()}`);
   if (!response.ok) {
     throw new Error(`FHL API error: ${response.statusText}`);
   }
@@ -105,7 +133,7 @@ export async function searchBible(
     gb: simplified ? "1" : "0",
   });
 
-  const response = await fetch(`${FHL_API_BASE}search.php?${params.toString()}`);
+  const response = await fetchWithTimeout(`${FHL_API_BASE}search.php?${params.toString()}`);
   if (!response.ok) {
     throw new Error(`FHL API error: ${response.statusText}`);
   }
@@ -117,7 +145,7 @@ export async function searchBible(
  * Get list of Bible versions
  */
 export async function getBibleVersions(): Promise<{ record_count: number; record: BookInfo[] }> {
-  const response = await fetch(`${FHL_API_BASE}ab.php`);
+  const response = await fetchWithTimeout(`${FHL_API_BASE}ab.php`);
   if (!response.ok) {
     throw new Error(`FHL API error: ${response.statusText}`);
   }
@@ -129,7 +157,7 @@ export async function getBibleVersions(): Promise<{ record_count: number; record
  * Get book list
  */
 export async function getBookList(): Promise<string> {
-  const response = await fetch(`${FHL_API_BASE}listall.html`);
+  const response = await fetchWithTimeout(`${FHL_API_BASE}listall.html`);
   if (!response.ok) {
     throw new Error(`FHL API error: ${response.statusText}`);
   }
@@ -153,7 +181,7 @@ export async function getWordAnalysis(
     gb: simplified ? "1" : "0",
   });
 
-  const response = await fetch(`${FHL_API_BASE}qp.php?${params.toString()}`);
+  const response = await fetchWithTimeout(`${FHL_API_BASE}qp.php?${params.toString()}`);
   if (!response.ok) {
     throw new Error(`FHL API error: ${response.statusText}`);
   }
@@ -182,7 +210,7 @@ export async function getCommentary(
     params.append("book", commentaryId.toString());
   }
 
-  const response = await fetch(`${FHL_API_BASE}sc.php?${params.toString()}`);
+  const response = await fetchWithTimeout(`${FHL_API_BASE}sc.php?${params.toString()}`);
   if (!response.ok) {
     throw new Error(`FHL API error: ${response.statusText}`);
   }
@@ -198,7 +226,7 @@ export async function listCommentaries(simplified: boolean = false): Promise<any
     gb: simplified ? "1" : "0",
   });
 
-  const response = await fetch(`${FHL_API_BASE}sc.php?${params.toString()}`);
+  const response = await fetchWithTimeout(`${FHL_API_BASE}sc.php?${params.toString()}`);
   if (!response.ok) {
     throw new Error(`FHL API error: ${response.statusText}`);
   }
@@ -246,7 +274,7 @@ export async function lookupStrongs(
     gb: simplified ? "1" : "0",
   });
 
-  const response = await fetch(`${FHL_API_BASE}sd.php?${params.toString()}`);
+  const response = await fetchWithTimeout(`${FHL_API_BASE}sd.php?${params.toString()}`);
   if (!response.ok) {
     throw new Error(`FHL API error: ${response.statusText}`);
   }
@@ -296,7 +324,7 @@ export async function searchByStrongs(
     gb: simplified ? "1" : "0",
   });
 
-  const response = await fetch(`${FHL_API_BASE}search.php?${params.toString()}`);
+  const response = await fetchWithTimeout(`${FHL_API_BASE}search.php?${params.toString()}`);
   if (!response.ok) {
     throw new Error(`FHL API error: ${response.statusText}`);
   }
@@ -328,7 +356,7 @@ export async function getTopicStudy(
     gb: simplified ? "1" : "0",
   });
 
-  const response = await fetch(`${FHL_API_BASE}st.php?${params.toString()}`);
+  const response = await fetchWithTimeout(`${FHL_API_BASE}st.php?${params.toString()}`);
   if (!response.ok) {
     throw new Error(`FHL API error: ${response.statusText}`);
   }
@@ -353,7 +381,7 @@ export async function searchCommentary(
     params.append("book", commentaryId.toString());
   }
 
-  const response = await fetch(`${FHL_API_BASE}ssc.php?${params.toString()}`);
+  const response = await fetchWithTimeout(`${FHL_API_BASE}ssc.php?${params.toString()}`);
   if (!response.ok) {
     throw new Error(`FHL API error: ${response.statusText}`);
   }

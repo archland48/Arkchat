@@ -8,12 +8,27 @@ export const dynamic = "force-dynamic";
 export const fetchCache = "force-no-store";
 export const revalidate = 0;
 
+// API timeout configuration (in milliseconds)
+const API_TIMEOUT = 25000; // 25 seconds for AI Builder API
+const BIBLE_API_TIMEOUT = 8000; // 8 seconds for Bible API calls
+
+// Helper function to add timeout to promises
+function withTimeout<T>(promise: Promise<T>, timeoutMs: number, errorMessage: string): Promise<T> {
+  return Promise.race([
+    promise,
+    new Promise<T>((_, reject) =>
+      setTimeout(() => reject(new Error(errorMessage)), timeoutMs)
+    ),
+  ]);
+}
+
 const openai = new OpenAI({
   baseURL: "https://space.ai-builders.com/backend/v1",
   apiKey: process.env.AI_BUILDER_TOKEN,
   defaultHeaders: {
     "Authorization": `Bearer ${process.env.AI_BUILDER_TOKEN}`,
   },
+  timeout: API_TIMEOUT,
 });
 
 export async function POST(req: NextRequest) {
@@ -47,15 +62,28 @@ export async function POST(req: NextRequest) {
         // Force treat as search query when Bible mode is enabled
         isBibleQuery = true;
         try {
-          const searchData = await searchBible(lastMessage.content, "unv", 15, false);
+          // Add timeout to Bible API calls
+          const searchData = await withTimeout(
+            searchBible(lastMessage.content, "unv", 15, false),
+            BIBLE_API_TIMEOUT,
+            "Bible search timed out"
+          );
           bibleContext += formatBibleSearchContext(searchData);
           
-          // Also get topic study and commentary
+          // Also get topic study and commentary (parallel with timeout)
           try {
             const { getTopicStudy, searchCommentary } = await import("@/lib/fhl-api");
             const [topicData, commentarySearch] = await Promise.allSettled([
-              getTopicStudy(lastMessage.content, "all", false, false),
-              searchCommentary(lastMessage.content, undefined, false)
+              withTimeout(
+                getTopicStudy(lastMessage.content, "all", false, false),
+                BIBLE_API_TIMEOUT,
+                "Topic study timed out"
+              ),
+              withTimeout(
+                searchCommentary(lastMessage.content, undefined, false),
+                BIBLE_API_TIMEOUT,
+                "Commentary search timed out"
+              )
             ]);
             
             if (topicData.status === 'fulfilled' && topicData.value.record && topicData.value.record.length > 0) {
@@ -93,14 +121,18 @@ export async function POST(req: NextRequest) {
         try {
           const bookId = parseBookName(bibleQuery.book);
           if (bookId) {
-            // Get verse data with Strong's numbers for original language analysis
-            const verseData = await getBibleVerse(
-              bookId,
-              bibleQuery.chapter,
-              bibleQuery.verse,
-              "unv",
-              true, // Include Strong's Number for original language explanation
-              false
+            // Get verse data with Strong's numbers for original language analysis (with timeout)
+            const verseData = await withTimeout(
+              getBibleVerse(
+                bookId,
+                bibleQuery.chapter,
+                bibleQuery.verse,
+                "unv",
+                true, // Include Strong's Number for original language explanation
+                false
+              ),
+              BIBLE_API_TIMEOUT,
+              "Verse fetch timed out"
             );
             bibleContext += formatBibleContext(verseData);
             
@@ -114,10 +146,24 @@ export async function POST(req: NextRequest) {
                   // study_verse_deep Step 3: 研究關鍵字詞 (lookup_strongs)
                   // study_verse_deep Step 4: 查詢註釋解經 (get_commentary)
                   
-                  // Fetch word analysis first (needed for Step 3: lookup_strongs)
-                  const wordData = await getWordAnalysis(bookId, bibleQuery.chapter, verseNum);
-                  if (wordData && wordData.record && wordData.record.length > 0) {
-                    bibleContext += formatWordAnalysisContext(wordData);
+                  // Fetch word analysis and commentary in parallel (with timeout)
+                  const [wordData, commentaryData] = await Promise.allSettled([
+                    withTimeout(
+                      getWordAnalysis(bookId, bibleQuery.chapter, verseNum),
+                      BIBLE_API_TIMEOUT,
+                      "Word analysis timed out"
+                    ),
+                    withTimeout(
+                      getCommentary(bookId, bibleQuery.chapter, verseNum),
+                      BIBLE_API_TIMEOUT,
+                      "Commentary fetch timed out"
+                    )
+                  ]);
+                  
+                  // Process word analysis
+                  if (wordData.status === 'fulfilled' && wordData.value && wordData.value.record && wordData.value.record.length > 0) {
+                    const wordDataValue = wordData.value;
+                    bibleContext += formatWordAnalysisContext(wordDataValue);
                     
                     // Step 3: Lookup Strong's Dictionary for key words
                     try {
@@ -126,7 +172,7 @@ export async function POST(req: NextRequest) {
                       
                       // Extract Strong's numbers from word analysis
                       const strongsNumbers = new Set<string>();
-                      wordData.record.forEach((word: any) => {
+                      wordDataValue.record.forEach((word: any) => {
                         if (word.strongs) {
                           // Parse Strong's number format (e.g., "G3056", "H430")
                           const strongsMatch = word.strongs.match(/([GH])(\d+)/i);
@@ -138,12 +184,16 @@ export async function POST(req: NextRequest) {
                         }
                       });
                       
-                      // Lookup top 3-5 Strong's numbers
+                      // Lookup top 3-5 Strong's numbers (with timeout)
                       if (strongsNumbers.size > 0) {
                         const strongsLookups = await Promise.allSettled(
                           Array.from(strongsNumbers).slice(0, 5).map((strongsNum) => {
                             const testament = strongsNum.startsWith("G") ? "NT" : "OT";
-                            return lookupStrongs(strongsNum, testament, false);
+                            return withTimeout(
+                              lookupStrongs(strongsNum, testament, false),
+                              BIBLE_API_TIMEOUT,
+                              `Strong's lookup timed out for ${strongsNum}`
+                            );
                           })
                         );
                         
@@ -170,16 +220,15 @@ export async function POST(req: NextRequest) {
                     } catch (error) {
                       console.error("Error looking up Strong's dictionary:", error);
                     }
-                  } else {
-                    console.error("Error fetching word analysis:", wordData);
+                  } else if (wordData.status === 'rejected') {
+                    console.error("Error fetching word analysis:", wordData.reason);
                   }
                   
-                  // Step 4: Get commentary
-                  const commentaryData = await getCommentary(bookId, bibleQuery.chapter, verseNum);
-                  if (commentaryData && commentaryData.record && commentaryData.record.length > 0) {
-                    bibleContext += formatCommentaryContext(commentaryData);
-                  } else {
-                    console.error("Error fetching commentary:", commentaryData);
+                  // Step 4: Process commentary (already fetched in parallel)
+                  if (commentaryData.status === 'fulfilled' && commentaryData.value && commentaryData.value.record && commentaryData.value.record.length > 0) {
+                    bibleContext += formatCommentaryContext(commentaryData.value);
+                  } else if (commentaryData.status === 'rejected') {
+                    console.error("Error fetching commentary:", commentaryData.reason);
                   }
                   
                   // Advanced Cross-Reference: Three-layer analysis
@@ -383,7 +432,11 @@ export async function POST(req: NextRequest) {
         try {
           const bookId = parseBookName(bibleQuery.book);
           if (bookId) {
-            const chapterData = await getBibleChapter(bookId, bibleQuery.chapter, "unv", false);
+            const chapterData = await withTimeout(
+              getBibleChapter(bookId, bibleQuery.chapter, "unv", false),
+              BIBLE_API_TIMEOUT,
+              "Chapter fetch timed out"
+            );
             bibleContext += formatBibleContext(chapterData);
           }
         } catch (error) {
@@ -394,15 +447,23 @@ export async function POST(req: NextRequest) {
         try {
           const keyword = bibleQuery.keyword;
           
-          // Priority 1: Search Bible verses (main content)
-          const searchData = await searchBible(keyword, "unv", 15, false);
+          // Priority 1: Search Bible verses (main content) - with timeout
+          const searchData = await withTimeout(
+            searchBible(keyword, "unv", 15, false),
+            BIBLE_API_TIMEOUT,
+            "Bible search timed out"
+          );
           bibleContext += formatBibleSearchContext(searchData);
           
           // Priority 2: study_topic_deep - 主題研究，全面探討聖經主題
-          // Step 2: 查詢主題查經資料 (get_topic_study)
+          // Step 2: 查詢主題查經資料 (get_topic_study) - with timeout
           try {
             const { getTopicStudy } = await import("@/lib/fhl-api");
-            const topicData = await getTopicStudy(keyword, "all", false, false);
+            const topicData = await withTimeout(
+              getTopicStudy(keyword, "all", false, false),
+              BIBLE_API_TIMEOUT,
+              "Topic study timed out"
+            );
             if (topicData.record && topicData.record.length > 0) {
               let topicContext = "\n\n[study_topic_deep - Step 2: Topic Study Resources - 主題查經資料 (Torrey & Naves)]\n";
               topicData.record.slice(0, 5).forEach((entry: any) => {
@@ -456,10 +517,14 @@ export async function POST(req: NextRequest) {
             console.error("Error comparing two testaments:", error);
           }
           
-          // Priority 3: Search commentary for additional insights
+          // Priority 3: Search commentary for additional insights - with timeout
           try {
             const { searchCommentary } = await import("@/lib/fhl-api");
-            const commentarySearch = await searchCommentary(keyword, undefined, false);
+            const commentarySearch = await withTimeout(
+              searchCommentary(keyword, undefined, false),
+              BIBLE_API_TIMEOUT,
+              "Commentary search timed out"
+            );
             if (commentarySearch.results && commentarySearch.results.length > 0) {
               let commentaryContext = "\n\n[Commentary Search Results - 註釋搜尋結果]\n";
               commentarySearch.results.slice(0, 5).forEach((result: any) => {
@@ -1028,13 +1093,19 @@ ${bibleContext || "[注意：未獲取到 FHL Bible API 數據，請基於你的
     console.log("Base URL:", "https://space.ai-builders.com/backend/v1");
     console.log("Messages count:", messages.length);
     console.log("Streaming:", useStreaming);
+    console.log("Bible context length:", bibleContext.length);
 
-    const completion = await openai.chat.completions.create({
-      model: selectedModel,
-      messages: enhancedMessages,
-      stream: useStreaming,
-      temperature: 0.7,
-    });
+    // Add timeout to AI API call
+    const completion = await withTimeout(
+      openai.chat.completions.create({
+        model: selectedModel,
+        messages: enhancedMessages,
+        stream: useStreaming,
+        temperature: 0.7,
+      }),
+      API_TIMEOUT,
+      "AI API request timed out"
+    );
 
     const encoder = new TextEncoder();
 
@@ -1110,17 +1181,26 @@ ${bibleContext || "[注意：未獲取到 FHL Bible API 數據，請基於你的
   } catch (error: any) {
     console.error("Chat API error:", error);
     const errorMessage = error.message || "Failed to process chat request";
+    const isTimeout = errorMessage.includes("timed out");
+    
     console.error("Error details:", {
       message: errorMessage,
       status: error.status,
       type: error.constructor.name,
+      isTimeout,
     });
+    
+    // Return 504 for timeout errors, 500 for other errors
+    const statusCode = isTimeout ? 504 : (error.status || 500);
+    
     return new Response(
       JSON.stringify({
-        error: errorMessage,
+        error: isTimeout 
+          ? "Request timed out. Please try again with a simpler query or disable Bible mode."
+          : errorMessage,
         details: error.status ? `Status: ${error.status}` : undefined,
       }),
-      { status: 500, headers: { "Content-Type": "application/json" } }
+      { status: statusCode, headers: { "Content-Type": "application/json" } }
     );
   }
 }
