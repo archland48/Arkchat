@@ -8,7 +8,9 @@ const deployConfig = {
   service_name: 'arkchat',
   branch: 'main',
   port: 3000,
-  env_vars: {}
+  env_vars: {
+    AI_BUILDER_TOKEN: AI_BUILDER_TOKEN
+  }
 };
 
 if (!deployConfig.repo_url) {
