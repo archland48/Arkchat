@@ -6,7 +6,7 @@
 
 API_BASE_URL="https://space.ai-builders.com/backend"
 SERVICE_NAME="arkchat"
-LOG_TYPE="${1:-build}"  # Default to 'build' if not specified
+LOG_TYPE="${1:-build}"  # Default to 'build' if not specified. Use 'runtime' for app logs.
 
 # Load environment variables
 if [ -f .env.local ]; then
@@ -70,17 +70,17 @@ case "$LOG_TYPE" in
   build)
     view_logs "build"
     ;;
-  app)
-    view_logs "app"
+  app|runtime)
+    view_logs "runtime"
     ;;
   all)
     echo "📦 BUILD LOGS:"
     echo "=============="
     view_logs "build"
     echo ""
-    echo "🚀 APP LOGS:"
-    echo "============"
-    view_logs "app"
+    echo "🚀 RUNTIME LOGS:"
+    echo "================"
+    view_logs "runtime"
     ;;
   *)
     echo "❌ Invalid log type: $LOG_TYPE"
@@ -88,9 +88,10 @@ case "$LOG_TYPE" in
     echo "Usage: $0 [log_type]"
     echo ""
     echo "Log types:"
-    echo "  build  - Build/deployment logs (default)"
-    echo "  app    - Application runtime logs"
-    echo "  all    - Both build and app logs"
+    echo "  build   - Build/deployment logs (default)"
+    echo "  app     - Application runtime logs (alias for 'runtime')"
+    echo "  runtime - Application runtime logs"
+    echo "  all     - Both build and runtime logs"
     echo ""
     echo "Examples:"
     echo "  $0           # View build logs"

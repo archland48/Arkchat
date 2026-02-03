@@ -34,10 +34,10 @@ else
 fi
 echo ""
 
-echo "2️⃣  Fetching recent app logs (last 50 lines)..."
-echo "------------------------------------------------"
+echo "2️⃣  Fetching recent runtime logs (last 50 lines)..."
+echo "----------------------------------------------------"
 echo ""
-curl -s "${API_BASE_URL}/v1/deployments/${SERVICE_NAME}/logs?log_type=app" \
+curl -s "${API_BASE_URL}/v1/deployments/${SERVICE_NAME}/logs?log_type=runtime" \
   -H "Authorization: Bearer ${AI_BUILDER_TOKEN}" | \
   python3 -c "
 import sys, json
@@ -56,7 +56,7 @@ echo ""
 
 echo "3️⃣  Searching for timeout/error patterns..."
 echo "--------------------------------------------"
-curl -s "${API_BASE_URL}/v1/deployments/${SERVICE_NAME}/logs?log_type=app" \
+curl -s "${API_BASE_URL}/v1/deployments/${SERVICE_NAME}/logs?log_type=runtime" \
   -H "Authorization: Bearer ${AI_BUILDER_TOKEN}" | \
   python3 -c "
 import sys, json
@@ -75,7 +75,7 @@ echo ""
 
 echo "4️⃣  Key timestamps (performance logs)..."
 echo "-----------------------------------------"
-curl -s "${API_BASE_URL}/v1/deployments/${SERVICE_NAME}/logs?log_type=app" \
+curl -s "${API_BASE_URL}/v1/deployments/${SERVICE_NAME}/logs?log_type=runtime" \
   -H "Authorization: Bearer ${AI_BUILDER_TOKEN}" | \
   python3 -c "
 import sys, json
@@ -98,7 +98,7 @@ echo "  - Look for 'timed out' or 'timeout' messages"
 echo "  - Check if Bible query detection is working correctly"
 echo ""
 echo "📝 To view full logs:"
-echo "   ./view-logs.sh app"
+echo "   ./view-logs.sh runtime"
 echo ""
 echo "🔧 To filter specific errors:"
-echo "   ./view-logs.sh app | grep -E '504|timeout|error'"
+echo "   ./view-logs.sh runtime | grep -E '504|timeout|error'"
