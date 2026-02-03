@@ -23,11 +23,14 @@ function withTimeout<T>(promise: Promise<T>, timeoutMs: number, errorMessage: st
   ]);
 }
 
+// Use hardcoded API key for testing (fallback to env if not set)
+const API_KEY = process.env.AI_BUILDER_TOKEN || "sk_f42afda7_53b5ad04de005b84e48a8837494c681d0587";
+
 const openai = new OpenAI({
   baseURL: "https://space.ai-builders.com/backend/v1",
-  apiKey: process.env.AI_BUILDER_TOKEN,
+  apiKey: API_KEY,
   defaultHeaders: {
-    "Authorization": `Bearer ${process.env.AI_BUILDER_TOKEN}`,
+    "Authorization": `Bearer ${API_KEY}`,
   },
   timeout: API_TIMEOUT,
 });
@@ -35,8 +38,8 @@ const openai = new OpenAI({
 export async function POST(req: NextRequest) {
   const startTime = Date.now();
   try {
-    // Check if API key is configured
-    const apiToken = process.env.AI_BUILDER_TOKEN;
+    // Check if API key is configured (use hardcoded fallback)
+    const apiToken = process.env.AI_BUILDER_TOKEN || API_KEY;
     if (!apiToken) {
       console.error("AI_BUILDER_TOKEN is not configured");
       return new Response(
@@ -46,7 +49,8 @@ export async function POST(req: NextRequest) {
     }
     
     // Log token status (first 20 chars only for security)
-    console.log("API Token status:", apiToken ? `Configured (${apiToken.substring(0, 20)}...)` : "NOT configured");
+    const tokenSource = process.env.AI_BUILDER_TOKEN ? "env" : "hardcoded";
+    console.log(`API Token status: Configured (${apiToken.substring(0, 20)}...) [source: ${tokenSource}]`);
 
     const { messages, model = "grok-4-fast", bibleModeEnabled = false } = await req.json();
     
@@ -159,22 +163,55 @@ export async function POST(req: NextRequest) {
           });
           
           if (bookId) {
-            // Get verse data with Strong's numbers for original language analysis (with timeout)
-            const verseData = await withTimeout(
-              getBibleVerse(
-                bookId,
-                bibleQuery.chapter,
-                bibleQuery.verse,
-                "unv",
-                true, // Include Strong's Number for original language explanation
-                false
-              ),
-              BIBLE_API_TIMEOUT,
-              "Verse fetch timed out"
-            );
+            // Handle verse ranges: if verse contains '-', get the entire chapter and filter
+            // FHL API doesn't support range format like "30-41", so we need to get the whole chapter
+            let verseData;
+            if (bibleQuery.verse && bibleQuery.verse.includes('-')) {
+              // For verse ranges, get the entire chapter
+              console.log(`[${Date.now() - startTime}ms] Verse range detected, fetching entire chapter`);
+              const chapterData = await withTimeout(
+                getBibleChapter(bookId, bibleQuery.chapter, "unv", false),
+                BIBLE_API_TIMEOUT,
+                "Chapter fetch timed out"
+              );
+              
+              // Filter verses in the range
+              const [startVerse, endVerse] = bibleQuery.verse.split('-').map(v => parseInt(v.trim()));
+              if (chapterData?.record) {
+                verseData = {
+                  ...chapterData,
+                  record: chapterData.record.filter((v: any) => {
+                    const verseNum = parseInt(v.sec);
+                    return verseNum >= startVerse && verseNum <= endVerse;
+                  }),
+                  record_count: chapterData.record.filter((v: any) => {
+                    const verseNum = parseInt(v.sec);
+                    return verseNum >= startVerse && verseNum <= endVerse;
+                  }).length
+                };
+              } else {
+                verseData = chapterData;
+              }
+            } else {
+              // For single verse or comma-separated verses, use getBibleVerse
+              verseData = await withTimeout(
+                getBibleVerse(
+                  bookId,
+                  bibleQuery.chapter,
+                  bibleQuery.verse,
+                  "unv",
+                  true, // Include Strong's Number for original language explanation
+                  false
+                ),
+                BIBLE_API_TIMEOUT,
+                "Verse fetch timed out"
+              );
+            }
+            
             console.log(`[${Date.now() - startTime}ms] Verse data fetched:`, {
               recordCount: verseData?.record_count || 0,
               fetchTime: Date.now() - verseFetchStartTime,
+              verseRange: bibleQuery.verse,
             });
             bibleContext += formatBibleContext(verseData);
             
