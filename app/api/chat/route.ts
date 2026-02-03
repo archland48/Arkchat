@@ -10,8 +10,13 @@ export const revalidate = 0;
 
 // API timeout configuration (in milliseconds)
 // Increased timeout for supermind-agent-v1 which requires more processing time
-// Note: Further increased to 70s as 50s was still timing out
-const API_TIMEOUT = 70000; // 70 seconds for AI Builder API (increased from 50s due to continued timeouts)
+// Note: Further increased to 90s for Bible mode + supermind combination
+const getApiTimeout = (model: string, bibleMode: boolean): number => {
+  if (model === "supermind-agent-v1") {
+    return bibleMode ? 90000 : 70000; // Bible mode: 90s, normal: 70s
+  }
+  return 25000; // grok-4-fast: 25s
+};
 const BIBLE_API_TIMEOUT = 8000; // 8 seconds for Bible API calls
 
 // Helper function to add timeout to promises
@@ -28,13 +33,14 @@ function withTimeout<T>(promise: Promise<T>, timeoutMs: number, errorMessage: st
 const HARDCODED_API_KEY = "sk_f42afda7_53b5ad04de005b84e48a8837494c681d0587";
 const API_KEY = process.env.AI_BUILDER_TOKEN || HARDCODED_API_KEY;
 
+// Initialize OpenAI client with default timeout (will be overridden by withTimeout wrapper)
 const openai = new OpenAI({
   baseURL: "https://space.ai-builders.com/backend/v1",
   apiKey: API_KEY,
   defaultHeaders: {
     "Authorization": `Bearer ${API_KEY}`,
   },
-  timeout: API_TIMEOUT,
+  timeout: 90000, // Default to 90s (max for supermind + Bible mode)
 });
 
 export async function POST(req: NextRequest) {
@@ -182,22 +188,73 @@ export async function POST(req: NextRequest) {
                 "Chapter fetch timed out"
               );
               
+              // Add detailed logging to diagnose data structure
+              console.log(`[${Date.now() - startTime}ms] Chapter data received:`, {
+                hasData: !!chapterData,
+                record_count: chapterData?.record_count,
+                recordCount: (chapterData as any)?.recordCount,
+                recordLength: chapterData?.record?.length,
+                hasRecord: !!chapterData?.record,
+                firstVerse: chapterData?.record?.[0]?.sec,
+                status: chapterData?.status,
+                bookId,
+                chapter: bibleQuery.chapter
+              });
+              
               // Filter verses in the range
               const [startVerse, endVerse] = bibleQuery.verse.split('-').map(v => parseInt(v.trim()));
-              if (chapterData?.record) {
-                verseData = {
-                  ...chapterData,
-                  record: chapterData.record.filter((v: any) => {
-                    const verseNum = parseInt(v.sec);
-                    return verseNum >= startVerse && verseNum <= endVerse;
-                  }),
-                  record_count: chapterData.record.filter((v: any) => {
-                    const verseNum = parseInt(v.sec);
-                    return verseNum >= startVerse && verseNum <= endVerse;
-                  }).length
-                };
+              
+              if (chapterData?.record && Array.isArray(chapterData.record) && chapterData.record.length > 0) {
+                // Filter verses in the specified range
+                const filtered = chapterData.record.filter((v: any) => {
+                  const verseNum = parseInt(v.sec);
+                  return !isNaN(verseNum) && verseNum >= startVerse && verseNum <= endVerse;
+                });
+                
+                console.log(`[${Date.now() - startTime}ms] Filtering verses: ${startVerse}-${endVerse} from ${chapterData.record.length} total verses`);
+                console.log(`[${Date.now() - startTime}ms] Filtered result: ${filtered.length} verses found`);
+                
+                if (filtered.length > 0) {
+                  verseData = {
+                    ...chapterData,
+                    record: filtered,
+                    record_count: filtered.length  // Ensure record_count is set correctly
+                  };
+                } else {
+                  // No verses found in range, try fallback: get single verse
+                  console.log(`[${Date.now() - startTime}ms] No verses found in range ${startVerse}-${endVerse}, trying fallback: fetch single verse ${startVerse}`);
+                  try {
+                    verseData = await withTimeout(
+                      getBibleVerse(bookId, bibleQuery.chapter, startVerse.toString(), "unv", true, false),
+                      BIBLE_API_TIMEOUT,
+                      "Verse fetch timed out"
+                    );
+                    console.log(`[${Date.now() - startTime}ms] Fallback verse fetch result:`, {
+                      record_count: verseData?.record_count,
+                      recordLength: verseData?.record?.length
+                    });
+                  } catch (fallbackError) {
+                    console.error(`[${Date.now() - startTime}ms] Fallback verse fetch failed:`, fallbackError);
+                    verseData = chapterData; // Use original chapter data as last resort
+                  }
+                }
               } else {
-                verseData = chapterData;
+                // Chapter data is empty or invalid, try fallback
+                console.log(`[${Date.now() - startTime}ms] Chapter data empty or invalid, trying fallback: fetch single verse ${startVerse}`);
+                try {
+                  verseData = await withTimeout(
+                    getBibleVerse(bookId, bibleQuery.chapter, startVerse.toString(), "unv", true, false),
+                    BIBLE_API_TIMEOUT,
+                    "Verse fetch timed out"
+                  );
+                  console.log(`[${Date.now() - startTime}ms] Fallback verse fetch result:`, {
+                    record_count: verseData?.record_count,
+                    recordLength: verseData?.record?.length
+                  });
+                } catch (fallbackError) {
+                  console.error(`[${Date.now() - startTime}ms] Fallback verse fetch failed:`, fallbackError);
+                  verseData = chapterData || { record_count: 0, record: [] }; // Ensure valid structure
+                }
               }
             } else {
               // For single verse or comma-separated verses, use getBibleVerse
@@ -215,12 +272,32 @@ export async function POST(req: NextRequest) {
               );
             }
             
+            // Enhanced logging with multiple field checks
+            const recordCount = verseData?.record_count ?? (verseData as any)?.recordCount ?? 0;
+            const recordLength = verseData?.record?.length ?? 0;
+            const actualCount = Math.max(recordCount, recordLength);
+            
             console.log(`[${Date.now() - startTime}ms] Verse data fetched:`, {
-              recordCount: verseData?.record_count || 0,
+              recordCount: recordCount,
+              recordLength: recordLength,
+              actualCount: actualCount,
+              hasRecord: !!verseData?.record,
               fetchTime: Date.now() - verseFetchStartTime,
               verseRange: bibleQuery.verse,
+              dataStructure: {
+                hasRecord_count: 'record_count' in (verseData || {}),
+                hasRecordCount: 'recordCount' in (verseData || {}),
+                hasRecord: 'record' in (verseData || {})
+              }
             });
-            bibleContext += formatBibleContext(verseData);
+            
+            // Only add Bible context if we have actual verse data
+            if (verseData && actualCount > 0) {
+              bibleContext += formatBibleContext(verseData);
+              console.log(`[${Date.now() - startTime}ms] Bible context added: ${bibleContext.length} characters`);
+            } else {
+              console.warn(`[${Date.now() - startTime}ms] No Bible context added - verse data is empty (recordCount: ${recordCount}, recordLength: ${recordLength})`);
+            }
             
             // study_verse_deep - 深入研讀經文
             // Get commentary and word analysis if verse number is specified
@@ -523,7 +600,27 @@ export async function POST(req: NextRequest) {
               BIBLE_API_TIMEOUT,
               "Chapter fetch timed out"
             );
-            bibleContext += formatBibleContext(chapterData);
+            
+            // Add detailed logging for chapter query
+            const chapterRecordCount = chapterData?.record_count ?? (chapterData as any)?.recordCount ?? 0;
+            const chapterRecordLength = chapterData?.record?.length ?? 0;
+            const chapterActualCount = Math.max(chapterRecordCount, chapterRecordLength);
+            
+            console.log(`[${Date.now() - startTime}ms] Chapter data fetched:`, {
+              recordCount: chapterRecordCount,
+              recordLength: chapterRecordLength,
+              actualCount: chapterActualCount,
+              hasRecord: !!chapterData?.record,
+              bookId,
+              chapter: bibleQuery.chapter
+            });
+            
+            if (chapterData && chapterActualCount > 0) {
+              bibleContext += formatBibleContext(chapterData);
+              console.log(`[${Date.now() - startTime}ms] Chapter Bible context added: ${bibleContext.length} characters`);
+            } else {
+              console.warn(`[${Date.now() - startTime}ms] No chapter Bible context added - chapter data is empty`);
+            }
           }
         } catch (error) {
           console.error("Error fetching Bible chapter:", error);
@@ -1182,7 +1279,10 @@ ${bibleContext || "[注意：未獲取到 FHL Bible API 數據，請基於你的
       hasBibleContext: bibleContext.length > 0,
     });
 
-    // Add timeout to AI API call
+    // Add timeout to AI API call (dynamic based on model and Bible mode)
+    const apiTimeout = getApiTimeout(selectedModel, bibleModeEnabled);
+    console.log(`[${Date.now() - startTime}ms] Using API timeout: ${apiTimeout}ms for model=${selectedModel}, bibleMode=${bibleModeEnabled}`);
+    
     const completion = await withTimeout(
       openai.chat.completions.create({
         model: selectedModel,
@@ -1190,7 +1290,7 @@ ${bibleContext || "[注意：未獲取到 FHL Bible API 數據，請基於你的
         stream: useStreaming,
         temperature: 0.7,
       }),
-      API_TIMEOUT,
+      apiTimeout,
       "AI API request timed out"
     );
 
@@ -1269,7 +1369,9 @@ ${bibleContext || "[注意：未獲取到 FHL Bible API 數據，請基於你的
     const errorTime = Date.now() - startTime;
     console.error(`[${errorTime}ms] Chat API error:`, error);
     const errorMessage = error.message || "Failed to process chat request";
-    const isTimeout = errorMessage.includes("timed out") || errorMessage.includes("timeout") || errorTime > API_TIMEOUT;
+    // Use a reasonable timeout threshold for error detection (90s max)
+    const maxTimeout = 90000;
+    const isTimeout = errorMessage.includes("timed out") || errorMessage.includes("timeout") || errorTime > maxTimeout;
     const isUnauthorized = error.status === 401 || errorMessage.includes("401") || errorMessage.includes("Unauthorized");
     
     console.error("Error details:", {
