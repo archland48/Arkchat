@@ -23,14 +23,13 @@ function withTimeout<T>(promise: Promise<T>, timeoutMs: number, errorMessage: st
   ]);
 }
 
-// Use hardcoded API key for testing (fallback to env if not set)
-const API_KEY = process.env.AI_BUILDER_TOKEN || "sk_f42afda7_53b5ad04de005b84e48a8837494c681d0587";
-
+// Initialize OpenAI client - API key will be validated in the request handler
+// Note: We initialize with undefined here and check in the handler to ensure env var is loaded
 const openai = new OpenAI({
   baseURL: "https://space.ai-builders.com/backend/v1",
-  apiKey: API_KEY,
+  apiKey: process.env.AI_BUILDER_TOKEN || "", // Will be validated in handler
   defaultHeaders: {
-    "Authorization": `Bearer ${API_KEY}`,
+    "Authorization": `Bearer ${process.env.AI_BUILDER_TOKEN || ""}`,
   },
   timeout: API_TIMEOUT,
 });
@@ -38,19 +37,26 @@ const openai = new OpenAI({
 export async function POST(req: NextRequest) {
   const startTime = Date.now();
   try {
-    // Check if API key is configured (use hardcoded fallback)
-    const apiToken = process.env.AI_BUILDER_TOKEN || API_KEY;
+    // Check if API key is configured (must be loaded from .env file)
+    const apiToken = process.env.AI_BUILDER_TOKEN;
     if (!apiToken) {
-      console.error("AI_BUILDER_TOKEN is not configured");
+      console.error("AI_BUILDER_TOKEN is not configured - please set it in .env.local file");
       return new Response(
-        JSON.stringify({ error: "API token not configured" }),
+        JSON.stringify({ error: "API token not configured. Please set AI_BUILDER_TOKEN in .env.local file." }),
         { status: 500, headers: { "Content-Type": "application/json" } }
       );
     }
     
     // Log token status (first 20 chars only for security)
-    const tokenSource = process.env.AI_BUILDER_TOKEN ? "env" : "hardcoded";
-    console.log(`API Token status: Configured (${apiToken.substring(0, 20)}...) [source: ${tokenSource}]`);
+    console.log(`API Token status: Configured (${apiToken.substring(0, 20)}...) [source: .env file]`);
+    
+    // Update OpenAI client headers with the token (in case it wasn't loaded at module init)
+    if (openai.apiKey !== apiToken) {
+      openai.apiKey = apiToken;
+      openai.defaultHeaders = {
+        "Authorization": `Bearer ${apiToken}`,
+      };
+    }
 
     const { messages, model = "grok-4-fast", bibleModeEnabled = false } = await req.json();
     
