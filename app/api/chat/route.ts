@@ -9,7 +9,8 @@ export const fetchCache = "force-no-store";
 export const revalidate = 0;
 
 // API timeout configuration (in milliseconds)
-const API_TIMEOUT = 25000; // 25 seconds for AI Builder API
+// Increased timeout for supermind-agent-v1 which requires more processing time
+const API_TIMEOUT = 50000; // 50 seconds for AI Builder API (increased from 25s for supermind-agent-v1)
 const BIBLE_API_TIMEOUT = 8000; // 8 seconds for Bible API calls
 
 // Helper function to add timeout to promises
