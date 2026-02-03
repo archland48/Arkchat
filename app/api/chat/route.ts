@@ -23,11 +23,11 @@ function withTimeout<T>(promise: Promise<T>, timeoutMs: number, errorMessage: st
   ]);
 }
 
-// Initialize OpenAI client - API key will be validated in the request handler
-// Note: We initialize with undefined here and check in the handler to ensure env var is loaded
+// Initialize OpenAI client - API key loaded from .env file
+// The API key must be set in .env.local file
 const openai = new OpenAI({
   baseURL: "https://space.ai-builders.com/backend/v1",
-  apiKey: process.env.AI_BUILDER_TOKEN || "", // Will be validated in handler
+  apiKey: process.env.AI_BUILDER_TOKEN || "", // Loaded from .env.local
   defaultHeaders: {
     "Authorization": `Bearer ${process.env.AI_BUILDER_TOKEN || ""}`,
   },
@@ -49,14 +49,6 @@ export async function POST(req: NextRequest) {
     
     // Log token status (first 20 chars only for security)
     console.log(`API Token status: Configured (${apiToken.substring(0, 20)}...) [source: .env file]`);
-    
-    // Update OpenAI client headers with the token (in case it wasn't loaded at module init)
-    if (openai.apiKey !== apiToken) {
-      openai.apiKey = apiToken;
-      openai.defaultHeaders = {
-        "Authorization": `Bearer ${apiToken}`,
-      };
-    }
 
     const { messages, model = "grok-4-fast", bibleModeEnabled = false } = await req.json();
     
