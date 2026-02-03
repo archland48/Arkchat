@@ -49,21 +49,20 @@ export async function POST(req: NextRequest) {
 
     const { messages, model = "grok-4-fast", bibleModeEnabled = false } = await req.json();
     
-    // Log request details
-    const lastMessage = messages[messages.length - 1];
-    console.log(`[${Date.now() - startTime}ms] Request received:`, {
-      model,
-      bibleModeEnabled,
-      messageLength: lastMessage?.content?.length || 0,
-      messagePreview: lastMessage?.content?.substring(0, 50) || "",
-    });
-    
     // Validate model
     const validModels = ["grok-4-fast", "supermind-agent-v1"];
     const selectedModel = validModels.includes(model) ? model : "grok-4-fast";
     
     // Detect Bible query from the last user message
     const lastMessage = messages[messages.length - 1];
+    
+    // Log request details
+    console.log(`[${Date.now() - startTime}ms] Request received:`, {
+      model: selectedModel,
+      bibleModeEnabled,
+      messageLength: lastMessage?.content?.length || 0,
+      messagePreview: lastMessage?.content?.substring(0, 50) || "",
+    });
     let bibleContext = "";
     let isBibleQuery = false;
     
