@@ -19,6 +19,7 @@ export default function ChatInput({
   const [input, setInput] = useState("");
   const [isComposing, setIsComposing] = useState(false);
   const [justComposed, setJustComposed] = useState(false);
+  const [enterAfterComposition, setEnterAfterComposition] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   const handleSubmit = () => {
@@ -43,43 +44,64 @@ export default function ChatInput({
       e.preventDefault();
       handleSubmit();
       setJustComposed(false);
-      return;
-    }
-    
-    // 如果刚刚完成中文输入确认，忽略第一个 Enter 键
-    // 这样可以避免在确认输入后立即发送消息
-    if (e.key === "Enter" && justComposed) {
-      e.preventDefault();
-      setJustComposed(false);
-      // 允许换行，但不发送
+      setEnterAfterComposition(false);
       return;
     }
     
     // 如果正在使用中文输入法（IME），Enter 键用于确认输入
     if (e.key === "Enter" && isComposing) {
       // 让输入法处理 Enter 键（确认输入）
-      // 标记刚刚完成输入，下一个 Enter 将被忽略
       return;
     }
     
-    // 普通 Enter 键允许换行（不发送）
-    // 只有在非 composition 状态下，Enter 才用于换行
+    // 如果刚刚完成中文输入确认，第一个 Enter 键用于发送消息（像 Cursor 一样）
+    if (e.key === "Enter" && justComposed && !enterAfterComposition) {
+      e.preventDefault();
+      setEnterAfterComposition(true);
+      // 发送消息
+      if (input.trim() && !disabled) {
+        handleSubmit();
+      }
+      setJustComposed(false);
+      return;
+    }
+    
+    // 如果已经按过一次 Enter（在确认输入后），第二次 Enter 允许换行
+    if (e.key === "Enter" && enterAfterComposition) {
+      // 允许换行（不阻止默认行为）
+      setEnterAfterComposition(false);
+      return;
+    }
+    
+    // 普通 Enter 键：如果输入框为空或只有空白，发送消息；否则换行
+    if (e.key === "Enter" && !isComposing && !justComposed) {
+      // 如果输入为空或只有空白，发送消息
+      if (!input.trim()) {
+        e.preventDefault();
+        handleSubmit();
+        return;
+      }
+      // 否则允许换行（不阻止默认行为）
+    }
   };
 
   // 处理中文输入法（IME）的 composition 事件
   const handleCompositionStart = () => {
     setIsComposing(true);
     setJustComposed(false);
+    setEnterAfterComposition(false);
   };
 
   const handleCompositionEnd = () => {
     setIsComposing(false);
-    // 标记刚刚完成输入，下一个 Enter 键将被忽略
+    // 标记刚刚完成输入，下一个 Enter 键将发送消息（像 Cursor 一样）
     setJustComposed(true);
-    // 500ms 后清除标记，避免永久阻止 Enter
+    setEnterAfterComposition(false);
+    // 300ms 后清除标记，避免永久影响
     setTimeout(() => {
       setJustComposed(false);
-    }, 500);
+      setEnterAfterComposition(false);
+    }, 300);
   };
 
   const adjustTextareaHeight = () => {
