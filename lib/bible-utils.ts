@@ -21,16 +21,37 @@ export interface BibleQuery {
 export function detectBibleQuery(message: string): BibleQuery {
   const lowerMessage = message.toLowerCase().trim();
 
+  // Helper function to convert Chinese numbers to Arabic numbers
+  function chineseToNumber(chinese: string): number | null {
+    const map: Record<string, number> = {
+      "一": 1, "二": 2, "三": 3, "四": 4, "五": 5,
+      "六": 6, "七": 7, "八": 8, "九": 9, "十": 10,
+      "十一": 11, "十二": 12, "十三": 13, "十四": 14, "十五": 15,
+      "十六": 16, "十七": 17, "十八": 18, "十九": 19, "二十": 20,
+      "廿": 20, "卅": 30, "卌": 40, "五十": 50, "六十": 60,
+      "七十": 70, "八十": 80, "九十": 90, "一百": 100
+    };
+    return map[chinese] || null;
+  }
+
   // Check for verse reference patterns
   // Pattern: book chapter:verse or book chapter verse
+  // Also support: book 章 verse節 (e.g., "馬可福音四章30-41節")
   const versePatterns = [
+    // Standard format: book chapter:verse
     /(?:約翰福音|約|john|joh)\s*(\d+)[:：]\s*(\d+(?:-\d+)?(?:,\d+)*)/i,
     /(?:馬太福音|太|matthew|mat)\s*(\d+)[:：]\s*(\d+(?:-\d+)?(?:,\d+)*)/i,
     /(?:馬可福音|可|mark|mar)\s*(\d+)[:：]\s*(\d+(?:-\d+)?(?:,\d+)*)/i,
     /(?:路加福音|路|luke|luk)\s*(\d+)[:：]\s*(\d+(?:-\d+)?(?:,\d+)*)/i,
     /(?:創世記|創|genesis|gen)\s*(\d+)[:：]\s*(\d+(?:-\d+)?(?:,\d+)*)/i,
     /(?:出埃及記|出|exodus|exo)\s*(\d+)[:：]\s*(\d+(?:-\d+)?(?:,\d+)*)/i,
-    // Add more book patterns as needed
+    // Chinese format: book 章 verse節 (e.g., "馬可福音四章30-41節")
+    /(?:約翰福音|約|john|joh)\s*(?:第)?([一二三四五六七八九十]+|\d+)章\s*(\d+(?:-\d+)?(?:,\d+)*)節?/i,
+    /(?:馬太福音|太|matthew|mat)\s*(?:第)?([一二三四五六七八九十]+|\d+)章\s*(\d+(?:-\d+)?(?:,\d+)*)節?/i,
+    /(?:馬可福音|可|mark|mar)\s*(?:第)?([一二三四五六七八九十]+|\d+)章\s*(\d+(?:-\d+)?(?:,\d+)*)節?/i,
+    /(?:路加福音|路|luke|luk)\s*(?:第)?([一二三四五六七八九十]+|\d+)章\s*(\d+(?:-\d+)?(?:,\d+)*)節?/i,
+    /(?:創世記|創|genesis|gen)\s*(?:第)?([一二三四五六七八九十]+|\d+)章\s*(\d+(?:-\d+)?(?:,\d+)*)節?/i,
+    /(?:出埃及記|出|exodus|exo)\s*(?:第)?([一二三四五六七八九十]+|\d+)章\s*(\d+(?:-\d+)?(?:,\d+)*)節?/i,
   ];
 
   for (const pattern of versePatterns) {
@@ -38,12 +59,36 @@ export function detectBibleQuery(message: string): BibleQuery {
     if (match) {
       const bookMatch = message.match(/^(約翰福音|約|john|joh|馬太福音|太|matthew|mat|馬可福音|可|mark|mar|路加福音|路|luke|luk|創世記|創|genesis|gen|出埃及記|出|exodus|exo)/i);
       if (bookMatch) {
-        return {
-          type: "verse",
-          book: bookMatch[1],
-          chapter: parseInt(match[1]),
-          verse: match[2],
-        };
+        // Parse chapter number (support Chinese numbers)
+        let chapterNum: number;
+        const chapterStr = match[1];
+        if (/[\u4e00-\u9fa5]/.test(chapterStr)) {
+          // Chinese number
+          const num = chineseToNumber(chapterStr);
+          if (num !== null) {
+            chapterNum = num;
+          } else {
+            // Try to parse as "十X" format
+            if (chapterStr.startsWith("十")) {
+              const remainder = chineseToNumber(chapterStr.slice(1));
+              chapterNum = remainder ? 10 + remainder : parseInt(chapterStr) || 0;
+            } else {
+              continue; // Skip if can't parse
+            }
+          }
+        } else {
+          // Arabic number
+          chapterNum = parseInt(chapterStr);
+        }
+        
+        if (chapterNum > 0) {
+          return {
+            type: "verse",
+            book: bookMatch[1],
+            chapter: chapterNum,
+            verse: match[2],
+          };
+        }
       }
     }
   }

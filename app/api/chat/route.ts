@@ -32,6 +32,7 @@ const openai = new OpenAI({
 });
 
 export async function POST(req: NextRequest) {
+  const startTime = Date.now();
   try {
     // Check if API key is configured
     const apiToken = process.env.AI_BUILDER_TOKEN;
@@ -47,6 +48,15 @@ export async function POST(req: NextRequest) {
     console.log("API Token status:", apiToken ? `Configured (${apiToken.substring(0, 20)}...)` : "NOT configured");
 
     const { messages, model = "grok-4-fast", bibleModeEnabled = false } = await req.json();
+    
+    // Log request details
+    const lastMessage = messages[messages.length - 1];
+    console.log(`[${Date.now() - startTime}ms] Request received:`, {
+      model,
+      bibleModeEnabled,
+      messageLength: lastMessage?.content?.length || 0,
+      messagePreview: lastMessage?.content?.substring(0, 50) || "",
+    });
     
     // Validate model
     const validModels = ["grok-4-fast", "supermind-agent-v1"];
@@ -64,7 +74,16 @@ export async function POST(req: NextRequest) {
     
     // Priority: If Bible mode is enabled OR a Bible query is detected, process as Bible query
     if (lastMessage && lastMessage.role === "user" && !shouldSkipBibleDetection) {
+      const bibleQueryStartTime = Date.now();
       const bibleQuery = detectBibleQuery(lastMessage.content);
+      console.log(`[${Date.now() - startTime}ms] Bible query detection:`, {
+        detected: bibleQuery.type,
+        book: bibleQuery.book,
+        chapter: bibleQuery.chapter,
+        verse: bibleQuery.verse,
+        keyword: bibleQuery.keyword,
+        detectionTime: Date.now() - bibleQueryStartTime,
+      });
       
       // Only process Bible queries if:
       // 1. Bible mode is explicitly enabled, OR
@@ -136,8 +155,16 @@ export async function POST(req: NextRequest) {
       
       if (bibleQuery.type === "verse" && bibleQuery.book && bibleQuery.chapter) {
         isBibleQuery = true;
+        const verseFetchStartTime = Date.now();
         try {
           const bookId = parseBookName(bibleQuery.book);
+          console.log(`[${Date.now() - startTime}ms] Processing verse query:`, {
+            book: bibleQuery.book,
+            bookId,
+            chapter: bibleQuery.chapter,
+            verse: bibleQuery.verse,
+          });
+          
           if (bookId) {
             // Get verse data with Strong's numbers for original language analysis (with timeout)
             const verseData = await withTimeout(
@@ -152,6 +179,10 @@ export async function POST(req: NextRequest) {
               BIBLE_API_TIMEOUT,
               "Verse fetch timed out"
             );
+            console.log(`[${Date.now() - startTime}ms] Verse data fetched:`, {
+              recordCount: verseData?.record_count || 0,
+              fetchTime: Date.now() - verseFetchStartTime,
+            });
             bibleContext += formatBibleContext(verseData);
             
             // study_verse_deep - 深入研讀經文
@@ -1103,11 +1134,14 @@ ${bibleContext || "[注意：未獲取到 FHL Bible API 數據，請基於你的
     // supermind-agent-v1 doesn't support streaming
     const useStreaming = selectedModel !== "supermind-agent-v1";
 
-    console.log("Making API request with model:", selectedModel);
-    console.log("Base URL:", "https://space.ai-builders.com/backend/v1");
-    console.log("Messages count:", messages.length);
-    console.log("Streaming:", useStreaming);
-    console.log("Bible context length:", bibleContext.length);
+    const aiApiStartTime = Date.now();
+    console.log(`[${Date.now() - startTime}ms] Making AI API request:`, {
+      model: selectedModel,
+      messagesCount: messages.length,
+      streaming: useStreaming,
+      bibleContextLength: bibleContext.length,
+      hasBibleContext: bibleContext.length > 0,
+    });
 
     // Add timeout to AI API call
     const completion = await withTimeout(
@@ -1193,9 +1227,10 @@ ${bibleContext || "[注意：未獲取到 FHL Bible API 數據，請基於你的
       });
     }
   } catch (error: any) {
-    console.error("Chat API error:", error);
+    const errorTime = Date.now() - startTime;
+    console.error(`[${errorTime}ms] Chat API error:`, error);
     const errorMessage = error.message || "Failed to process chat request";
-    const isTimeout = errorMessage.includes("timed out");
+    const isTimeout = errorMessage.includes("timed out") || errorMessage.includes("timeout") || errorTime > API_TIMEOUT;
     const isUnauthorized = error.status === 401 || errorMessage.includes("401") || errorMessage.includes("Unauthorized");
     
     console.error("Error details:", {
@@ -1204,6 +1239,8 @@ ${bibleContext || "[注意：未獲取到 FHL Bible API 數據，請基於你的
       type: error.constructor.name,
       isTimeout,
       isUnauthorized,
+      totalTime: errorTime,
+      stack: error.stack?.substring(0, 200),
     });
     
     // Determine status code and error message
