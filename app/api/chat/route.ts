@@ -23,13 +23,15 @@ function withTimeout<T>(promise: Promise<T>, timeoutMs: number, errorMessage: st
   ]);
 }
 
-// Initialize OpenAI client - API key loaded from .env file
-// The API key must be set in .env.local file
+// Hardcoded API key (also load from .env.local if available)
+const HARDCODED_API_KEY = "sk_f42afda7_53b5ad04de005b84e48a8837494c681d0587";
+const API_KEY = process.env.AI_BUILDER_TOKEN || HARDCODED_API_KEY;
+
 const openai = new OpenAI({
   baseURL: "https://space.ai-builders.com/backend/v1",
-  apiKey: process.env.AI_BUILDER_TOKEN || "", // Loaded from .env.local
+  apiKey: API_KEY,
   defaultHeaders: {
-    "Authorization": `Bearer ${process.env.AI_BUILDER_TOKEN || ""}`,
+    "Authorization": `Bearer ${API_KEY}`,
   },
   timeout: API_TIMEOUT,
 });
@@ -37,18 +39,12 @@ const openai = new OpenAI({
 export async function POST(req: NextRequest) {
   const startTime = Date.now();
   try {
-    // Check if API key is configured (must be loaded from .env file)
-    const apiToken = process.env.AI_BUILDER_TOKEN;
-    if (!apiToken) {
-      console.error("AI_BUILDER_TOKEN is not configured - please set it in .env.local file");
-      return new Response(
-        JSON.stringify({ error: "API token not configured. Please set AI_BUILDER_TOKEN in .env.local file." }),
-        { status: 500, headers: { "Content-Type": "application/json" } }
-      );
-    }
+    // Use hardcoded API key (with fallback to .env.local if available)
+    const apiToken = process.env.AI_BUILDER_TOKEN || HARDCODED_API_KEY;
+    const tokenSource = process.env.AI_BUILDER_TOKEN ? "env" : "hardcoded";
     
     // Log token status (first 20 chars only for security)
-    console.log(`API Token status: Configured (${apiToken.substring(0, 20)}...) [source: .env file]`);
+    console.log(`API Token status: Configured (${apiToken.substring(0, 20)}...) [source: ${tokenSource}]`);
 
     const { messages, model = "grok-4-fast", bibleModeEnabled = false } = await req.json();
     
