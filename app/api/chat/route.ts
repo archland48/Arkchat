@@ -67,13 +67,10 @@ export async function POST(req: NextRequest) {
     let bibleContext = "";
     let isBibleQuery = false;
     
-    // IMPORTANT: For supermind-agent-v1, skip automatic Bible query detection UNLESS Bible Mode is explicitly enabled
-    // If Bible Mode is enabled by user, always fetch Bible data regardless of model
-    // If Bible Mode is disabled, let supermind-agent-v1 decide when to use tools
-    const shouldSkipBibleDetection = selectedModel === "supermind-agent-v1" && !bibleModeEnabled;
-    
-    // Priority: If Bible mode is enabled OR a Bible query is detected, process as Bible query
-    if (lastMessage && lastMessage.role === "user" && !shouldSkipBibleDetection) {
+    // Simplified: Only detect and process Bible queries if Bible Mode is explicitly enabled
+    // This reduces processing time and lets AI models handle queries naturally
+    // If Bible Mode is disabled, skip all Bible detection and let the AI decide
+    if (lastMessage && lastMessage.role === "user" && bibleModeEnabled) {
       const bibleQueryStartTime = Date.now();
       const bibleQuery = detectBibleQuery(lastMessage.content);
       console.log(`[${Date.now() - startTime}ms] Bible query detection:`, {
@@ -85,16 +82,13 @@ export async function POST(req: NextRequest) {
         detectionTime: Date.now() - bibleQueryStartTime,
       });
       
-      // Only process Bible queries if:
-      // 1. Bible mode is explicitly enabled, OR
-      // 2. A clear Bible query pattern is detected (verse, chapter, or explicit search)
-      // Skip vague keyword matches for non-Bible queries
+      // Process Bible queries: verse, chapter, or search (when Bible mode is enabled)
       const isExplicitBibleQuery = bibleQuery.type === "verse" || 
                                     bibleQuery.type === "chapter" || 
-                                    (bibleQuery.type === "search" && bibleModeEnabled);
+                                    bibleQuery.type === "search";
       
-      // If Bible mode is enabled, treat ALL queries as Bible queries
-      if (bibleModeEnabled && bibleQuery.type === null) {
+      // If Bible mode is enabled but no explicit pattern detected, treat as search query
+      if (bibleQuery.type === null) {
         // Force treat as search query when Bible mode is enabled
         isBibleQuery = true;
         try {
@@ -149,9 +143,8 @@ export async function POST(req: NextRequest) {
         }
       }
       
-      // Process Bible queries (only if explicit Bible query detected)
-      // Skip if it's just a vague keyword match without explicit Bible context
-      if (isExplicitBibleQuery && (bibleModeEnabled || bibleQuery.type !== null)) {
+      // Process Bible queries (only if explicit Bible query detected and Bible mode is enabled)
+      if (isExplicitBibleQuery) {
       
       if (bibleQuery.type === "verse" && bibleQuery.book && bibleQuery.chapter) {
         isBibleQuery = true;
