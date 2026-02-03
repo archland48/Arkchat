@@ -97,14 +97,16 @@ export default function ChatInput({
 
   const handleCompositionEnd = () => {
     setIsComposing(false);
-    // 标记刚刚完成输入，下一个 Enter 键将发送消息（像 Cursor 一样）
+    // 标记刚刚完成输入
+    // 第一个 Enter = 确认输入（不阻止）
+    // 第二个 Enter = 发送消息
     setJustComposed(true);
     setEnterAfterComposition(false);
-    // 300ms 后清除标记，避免永久影响
+    // 500ms 后清除标记，避免永久影响
     setTimeout(() => {
       setJustComposed(false);
       setEnterAfterComposition(false);
-    }, 300);
+    }, 500);
   };
 
   const adjustTextareaHeight = () => {
