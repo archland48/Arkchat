@@ -4,7 +4,19 @@
 
 API_BASE_URL="https://space.ai-builders.com/backend"
 SERVICE_NAME="arkchat"
-AI_BUILDER_TOKEN="sk_f42afda7_53b5ad04de005b84e48a8837494c681d0587"
+AI_BUILDER_TOKEN="${AI_BUILDER_TOKEN}"
+
+if [ -z "$AI_BUILDER_TOKEN" ]; then
+  echo "❌ Error: AI_BUILDER_TOKEN environment variable is not set"
+  echo ""
+  echo "Please set it:"
+  echo "  export AI_BUILDER_TOKEN=your_token_here"
+  echo ""
+  echo "Or load from .env.local:"
+  echo "  source .env.local"
+  echo "  export AI_BUILDER_TOKEN"
+  exit 1
+fi
 
 echo "📊 Checking deployment status for $SERVICE_NAME..."
 echo ""

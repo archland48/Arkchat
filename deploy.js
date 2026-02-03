@@ -1,7 +1,18 @@
 const https = require('https');
 
 const API_BASE_URL = 'https://space.ai-builders.com/backend';
-const AI_BUILDER_TOKEN = process.env.AI_BUILDER_TOKEN || 'sk_f42afda7_53b5ad04de005b84e48a8837494c681d0587';
+// Load AI_BUILDER_TOKEN from environment variable
+// Make sure to set it: export AI_BUILDER_TOKEN=your_token_here
+const AI_BUILDER_TOKEN = process.env.AI_BUILDER_TOKEN;
+
+if (!AI_BUILDER_TOKEN) {
+  console.error('❌ Error: AI_BUILDER_TOKEN environment variable is required');
+  console.log('\n📝 Please set the environment variable:');
+  console.log('   export AI_BUILDER_TOKEN=your_token_here');
+  console.log('\nOr create a .env.local file with:');
+  console.log('   AI_BUILDER_TOKEN=your_token_here');
+  process.exit(1);
+}
 
 const deployConfig = {
   repo_url: process.env.REPO_URL || '',
