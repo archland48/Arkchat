@@ -49,12 +49,12 @@ export default function ChatInput({
     }
     
     // 如果正在使用中文输入法（IME），Enter 键用于确认输入
+    // 让输入法处理 Enter 键（确认输入），不阻止
     if (e.key === "Enter" && isComposing) {
-      // 让输入法处理 Enter 键（确认输入）
       return;
     }
     
-    // 如果刚刚完成中文输入确认，第一个 Enter 键用于发送消息（像 Cursor 一样）
+    // 如果刚刚完成中文输入确认（compositionend），下一个 Enter 键发送消息（像 Cursor 一样）
     if (e.key === "Enter" && justComposed && !enterAfterComposition) {
       e.preventDefault();
       setEnterAfterComposition(true);
@@ -62,26 +62,29 @@ export default function ChatInput({
       if (input.trim() && !disabled) {
         handleSubmit();
       }
+      // 不清除 justComposed，等待下一个 Enter
+      return;
+    }
+    
+    // 如果已经按过一次 Enter（在确认输入后发送了消息），第二次 Enter 允许换行
+    if (e.key === "Enter" && enterAfterComposition) {
+      // 清除标记，允许换行（不阻止默认行为）
+      setEnterAfterComposition(false);
       setJustComposed(false);
       return;
     }
     
-    // 如果已经按过一次 Enter（在确认输入后），第二次 Enter 允许换行
-    if (e.key === "Enter" && enterAfterComposition) {
-      // 允许换行（不阻止默认行为）
-      setEnterAfterComposition(false);
-      return;
-    }
-    
-    // 普通 Enter 键：如果输入框为空或只有空白，发送消息；否则换行
+    // 普通 Enter 键：Shift+Enter 换行，Enter 发送消息（像 Cursor 一样）
     if (e.key === "Enter" && !isComposing && !justComposed) {
-      // 如果输入为空或只有空白，发送消息
-      if (!input.trim()) {
-        e.preventDefault();
-        handleSubmit();
+      if (e.shiftKey) {
+        // Shift+Enter 允许换行（不阻止默认行为）
         return;
       }
-      // 否则允许换行（不阻止默认行为）
+      // Enter 发送消息
+      e.preventDefault();
+      if (input.trim() && !disabled) {
+        handleSubmit();
+      }
     }
   };
 
@@ -191,7 +194,7 @@ export default function ChatInput({
           {bibleModeEnabled ? (
             <span className="text-blue-400">📖 Bible Mode 已啟用 - 將自動查詢聖經資源</span>
           ) : (
-            "Bible Study Assistant - 支援經文查詢、章節閱讀、關鍵字搜尋 | Enter 換行，Ctrl+Enter 或點擊按鈕發送"
+            "Bible Study Assistant - 支援經文查詢、章節閱讀、關鍵字搜尋 | Enter 發送，Shift+Enter 換行，Ctrl+Enter 發送"
           )}
         </p>
       </div>
