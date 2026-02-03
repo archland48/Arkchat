@@ -10,7 +10,8 @@ export const revalidate = 0;
 
 // API timeout configuration (in milliseconds)
 // Increased timeout for supermind-agent-v1 which requires more processing time
-const API_TIMEOUT = 50000; // 50 seconds for AI Builder API (increased from 25s for supermind-agent-v1)
+// Note: Further increased to 70s as 50s was still timing out
+const API_TIMEOUT = 70000; // 70 seconds for AI Builder API (increased from 50s due to continued timeouts)
 const BIBLE_API_TIMEOUT = 8000; // 8 seconds for Bible API calls
 
 // Helper function to add timeout to promises
@@ -52,8 +53,20 @@ export async function POST(req: NextRequest) {
     const validModels = ["grok-4-fast", "supermind-agent-v1"];
     const selectedModel = validModels.includes(model) ? model : "grok-4-fast";
     
+    // Limit message history to reduce processing time and prevent timeout
+    // Keep system messages and recent conversation (last 10 messages)
+    const MAX_MESSAGES = 10;
+    let limitedMessages = messages;
+    if (messages.length > MAX_MESSAGES) {
+      // Keep system messages (usually at the beginning) and recent messages
+      const systemMessages = messages.filter((msg: any) => msg.role === "system");
+      const recentMessages = messages.slice(-MAX_MESSAGES);
+      limitedMessages = [...systemMessages, ...recentMessages];
+      console.log(`[${Date.now() - startTime}ms] Message history limited: ${messages.length} -> ${limitedMessages.length} messages`);
+    }
+    
     // Detect Bible query from the last user message
-    const lastMessage = messages[messages.length - 1];
+    const lastMessage = limitedMessages[limitedMessages.length - 1];
     
     // Log request details
     console.log(`[${Date.now() - startTime}ms] Request received:`, {
@@ -1143,10 +1156,10 @@ ${bibleContext || "[注意：未獲取到 FHL Bible API 數據，請基於你的
         }
       : null;
     
-    // Prepend system message if Bible context is available, otherwise use original messages
+    // Prepend system message if Bible context is available, otherwise use limited messages
     const enhancedMessages = systemMessage 
-      ? [systemMessage, ...messages]
-      : messages;
+      ? [systemMessage, ...limitedMessages]
+      : limitedMessages;
 
     if (!messages || !Array.isArray(messages)) {
       return new Response(
@@ -1161,7 +1174,9 @@ ${bibleContext || "[注意：未獲取到 FHL Bible API 數據，請基於你的
     const aiApiStartTime = Date.now();
     console.log(`[${Date.now() - startTime}ms] Making AI API request:`, {
       model: selectedModel,
-      messagesCount: messages.length,
+      messagesCount: enhancedMessages.length,
+      originalMessagesCount: messages.length,
+      limitedMessagesCount: limitedMessages.length,
       streaming: useStreaming,
       bibleContextLength: bibleContext.length,
       hasBibleContext: bibleContext.length > 0,
