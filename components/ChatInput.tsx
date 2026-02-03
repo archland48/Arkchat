@@ -54,24 +54,23 @@ export default function ChatInput({
       return;
     }
     
-    // 如果刚刚完成中文输入确认（compositionend），下一个 Enter 键发送消息（像 Cursor 一样）
-    if (e.key === "Enter" && justComposed && !enterAfterComposition) {
-      e.preventDefault();
-      setEnterAfterComposition(true);
-      // 发送消息
-      if (input.trim() && !disabled) {
-        handleSubmit();
+    // 如果刚刚完成中文输入确认（compositionend）
+    if (e.key === "Enter" && justComposed) {
+      if (!enterAfterComposition) {
+        // 第一次 Enter：确认输入（不阻止，让输入法处理）
+        setEnterAfterComposition(true);
+        // 不阻止，让输入法确认输入
+        return;
+      } else {
+        // 第二次 Enter：发送消息（像 Cursor 一样）
+        e.preventDefault();
+        setEnterAfterComposition(false);
+        setJustComposed(false);
+        if (input.trim() && !disabled) {
+          handleSubmit();
+        }
+        return;
       }
-      // 不清除 justComposed，等待下一个 Enter
-      return;
-    }
-    
-    // 如果已经按过一次 Enter（在确认输入后发送了消息），第二次 Enter 允许换行
-    if (e.key === "Enter" && enterAfterComposition) {
-      // 清除标记，允许换行（不阻止默认行为）
-      setEnterAfterComposition(false);
-      setJustComposed(false);
-      return;
     }
     
     // 普通 Enter 键：Shift+Enter 换行，Enter 发送消息（像 Cursor 一样）
