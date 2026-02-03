@@ -43,7 +43,9 @@ console.log('🚀 Starting deployment...');
 console.log(`📦 Service: ${deployConfig.service_name}`);
 console.log(`🔗 Repository: ${deployConfig.repo_url}`);
 console.log(`🌿 Branch: ${deployConfig.branch}`);
-console.log(`🔌 Port: ${deployConfig.port}\n`);
+console.log(`🔌 Port: ${deployConfig.port}`);
+console.log(`🔑 Environment Variables: AI_BUILDER_TOKEN=${deployConfig.env_vars.AI_BUILDER_TOKEN.substring(0, 20)}...`);
+console.log('');
 
 const req = https.request(options, (res) => {
   let data = '';
